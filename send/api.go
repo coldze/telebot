@@ -7,7 +7,7 @@ const (
 
 type SendType struct {
 	URL        string
-	Type int64
+	Type       int64
 	Parameters []byte
 }
 

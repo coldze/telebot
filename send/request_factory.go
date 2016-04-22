@@ -8,37 +8,36 @@ import (
 )
 
 const (
-	parse_mode_html = "HTML"
+	parse_mode_html     = "HTML"
 	parse_mode_markdown = "Markdown"
 
 	bot_query_fmt = "https://api.telegram.org/bot%s/"
 
-	cmd_get_updates = "%sgetUpdates"
-	cmd_get_me = "%sgetMe"
-	cmd_send_message = "%ssendMessage"
-	cmd_forward_message = "%sforwardMessage"
-	cmd_send_photo = "%ssendPhoto"
-	cmd_send_audio = "%ssendAudio"
-	cmd_send_document = "%ssendDocument"
-	cmd_send_sticker = "%ssendSticker"
-	cmd_send_video = "%ssendVideo"
-	cmd_send_voice = "%ssendVoice"
-	cmd_send_location = "%ssendLocation"
-	cmd_send_venue = "%ssendVenue"
-	cmd_send_contact = "%ssendContact"
-	cmd_send_chat_action = "%ssendChatAction"
+	cmd_get_updates             = "%sgetUpdates"
+	cmd_get_me                  = "%sgetMe"
+	cmd_send_message            = "%ssendMessage"
+	cmd_forward_message         = "%sforwardMessage"
+	cmd_send_photo              = "%ssendPhoto"
+	cmd_send_audio              = "%ssendAudio"
+	cmd_send_document           = "%ssendDocument"
+	cmd_send_sticker            = "%ssendSticker"
+	cmd_send_video              = "%ssendVideo"
+	cmd_send_voice              = "%ssendVoice"
+	cmd_send_location           = "%ssendLocation"
+	cmd_send_venue              = "%ssendVenue"
+	cmd_send_contact            = "%ssendContact"
+	cmd_send_chat_action        = "%ssendChatAction"
 	cmd_get_user_profile_photos = "%sgetUserProfilePhotos"
-	cmd_get_file = "https://api.telegram.org/file/bot%s/%s"
-	cmd_kick_chat_member = "%skickChatMember"
-	cmd_unban_chat_member = "%sunbanChatMember"
-	cmd_answer_callback_query = "%sanswerCallbackQuery"
-
+	cmd_get_file                = "https://api.telegram.org/file/bot%s/%s"
+	cmd_kick_chat_member        = "%skickChatMember"
+	cmd_unban_chat_member       = "%sunbanChatMember"
+	cmd_answer_callback_query   = "%sanswerCallbackQuery"
 )
 
 type RequestFactory struct {
 	sendStickerURL string
 	sendMessageURL string
-	getUpdatesURL string
+	getUpdatesURL  string
 }
 
 func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType, error) {
@@ -75,17 +74,17 @@ func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode
 		parseModeValue = parse_mode_markdown
 	}
 	sendMessage := send_requests.SendMessageType{
-		ChatID: chatID,
-		Text: message,
-		ParseMode: parseModeValue,
+		ChatID:                chatID,
+		Text:                  message,
+		ParseMode:             parseModeValue,
 		DisableWebPagePreview: disableWebPreview,
-		DisableNotification: disableNotifications,
-		ReplyToMessageID: replyToMessageID,
-		ReplyMarkup: markup}
+		DisableNotification:   disableNotifications,
+		ReplyToMessageID:      replyToMessageID,
+		ReplyMarkup:           markup}
 	return f.newPostSendType(f.sendMessageURL, sendMessage)
 }
 
-func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error){
+func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error) {
 	var parameters [3]string
 	paramsSlice := parameters[0:0]
 	if offset > 0 {
