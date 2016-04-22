@@ -54,7 +54,7 @@ func (f *RequestFactory) newPostSendType(url string, message interface{}) (*Send
 	if err != nil {
 		return nil, err
 	}
-	return &SendType{URL: f.sendStickerURL, Parameters: requestMessage, Type: SEND_TYPE_POST}, nil
+	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST}, nil
 }
 
 func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -105,6 +105,10 @@ func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64)
 		url = f.getUpdatesURL
 	}
 	return &SendType{URL: url, Type: SEND_TYPE_GET}, nil
+}
+
+func (f *RequestFactory) String() string {
+	return f.getUpdatesURL + "\n" + f.sendMessageURL + "\n" + f.sendStickerURL
 }
 
 func NewRequestFactory(botToken string) *RequestFactory {
