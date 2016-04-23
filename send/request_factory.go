@@ -1,7 +1,7 @@
 package send
 
 import (
-	"bitbucket.org/coldze/telebot/send/requests"
+	"github.com/coldze/telebot/send/requests"
 	"encoding/json"
 	"fmt"
 	"strings"
