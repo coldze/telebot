@@ -1,10 +1,5 @@
 package send_requests
 
-const (
-	PARSE_MODE_HTML = iota + 1
-	PARSE_MODE_MARKDOWN
-)
-
 type SendMessageType struct {
 	ChatID                string      `json:"chat_id"`
 	Text                  string      `json:"text"`

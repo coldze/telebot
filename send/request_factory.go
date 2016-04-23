@@ -1,10 +1,14 @@
 package send
 
 import (
-	"github.com/coldze/telebot/send/requests"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"github.com/coldze/telebot/send/internal/requests"
+)
+
+const (
+	PARSE_MODE_HTML = iota + 1
+	PARSE_MODE_MARKDOWN
 )
 
 const (
@@ -68,9 +72,9 @@ func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bo
 func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
 	var parseModeValue string
 	switch parseMode {
-	case send_requests.PARSE_MODE_HTML:
+	case PARSE_MODE_HTML:
 		parseModeValue = parse_mode_html
-	case send_requests.PARSE_MODE_MARKDOWN:
+	case PARSE_MODE_MARKDOWN:
 		parseModeValue = parse_mode_markdown
 	}
 	sendMessage := send_requests.SendMessageType{
@@ -85,25 +89,11 @@ func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode
 }
 
 func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error) {
-	var parameters [3]string
-	paramsSlice := parameters[0:0]
-	if offset > 0 {
-		paramsSlice = append(paramsSlice, fmt.Sprintf("offset=%d", offset))
-	}
-	if limit > 0 {
-		paramsSlice = append(paramsSlice, fmt.Sprintf("limit=%d", limit))
-	}
-	if timeout > 0 {
-		paramsSlice = append(paramsSlice, fmt.Sprint("timeout=%d", timeout))
-	}
-	query := strings.Join(paramsSlice, "&")
-	var url string
-	if len(query) > 0 {
-		url = fmt.Sprintf("%s?%s", f.getUpdatesURL, query)
-	} else {
-		url = f.getUpdatesURL
-	}
-	return &SendType{URL: url, Type: SEND_TYPE_GET}, nil
+	val := send_requests.GetUpdatesType{
+		Offset: offset,
+		Limit: limit,
+		Timeout: timeout}
+	return f.newPostSendType(f.getUpdatesURL, val)
 }
 
 func (f *RequestFactory) String() string {
