@@ -3,12 +3,13 @@ package telebot
 import (
 	"github.com/coldze/telebot/send"
 	"fmt"
-	"time"
 	"github.com/coldze/telebot/receive"
-	"encoding/json"
 	"net/http"
 	"bytes"
 	"io/ioutil"
+	"encoding/json"
+	"time"
+	"errors"
 )
 
 type Logger interface {
@@ -21,19 +22,23 @@ type Logger interface {
 type UpdateCallback func(update *receive.UpdateType) (*send.SendType, error)
 
 type Bot interface {
-	Send(send.SendType) error
+	Send(*send.SendType) error
 	Stop()
 }
 
 type botImpl struct {
 	stopBot chan struct{}
 	logger Logger
-	factory send.RequestFactory
+	factory *send.RequestFactory
 	OnUpdate UpdateCallback
 }
 
 func (b *botImpl) Stop() {
 	b.stopBot <- struct{}{}
+}
+
+func (b *botImpl) Send(*send.SendType) error {
+	return errors.New("Not implemented.")
 }
 
 func post(message *send.SendType) (result []byte, err error) {
@@ -129,7 +134,7 @@ func (b *botImpl) run() {
 	} ()
 }
 
-func NewPollingBot(factory send.RequestFactory, onUpdate UpdateCallback, logger Logger) Bot {
+func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, logger Logger) Bot {
 	stopUpdatesChan := make(chan struct{})
 	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate}
 	bot.run()
