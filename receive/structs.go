@@ -164,3 +164,10 @@ type UpdateResultType struct {
 	Ok      bool         `json:"ok"`
 	Updates []UpdateType `json:"result"`
 }
+
+type SendResult struct {
+	Ok          bool        `json:"ok"`
+	ErrorCode   int64       `json:"error_code,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Result      MessageType `json:"result,omitempty"`
+}
