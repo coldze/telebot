@@ -31,6 +31,7 @@ type botImpl struct {
 	logger   Logger
 	factory  *send.RequestFactory
 	OnUpdate UpdateCallback
+	period	time.Duration
 }
 
 func (b *botImpl) Stop() {
@@ -41,12 +42,13 @@ func (b *botImpl) Send(*send.SendType) error {
 	return errors.New("Not implemented.")
 }
 
-func post(message *send.SendType) (result []byte, err error) {
+func post(message *send.SendType) ([]byte, error) {
 	if message == nil {
 		return nil, fmt.Errorf("Message is nil. Nothing to send.")
 	}
 
 	var reply *http.Response
+	var err error
 	switch message.Type {
 	case send.SEND_TYPE_POST:
 		buffer := bytes.NewReader(message.Parameters)
@@ -60,11 +62,36 @@ func post(message *send.SendType) (result []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	respBody, err := ioutil.ReadAll(reply.Body)
+	return ioutil.ReadAll(reply.Body)
+}
+
+func poll(message *send.SendType) (*receive.UpdateResultType, error) {
+	response, err := post(message)
 	if err != nil {
 		return nil, err
 	}
-	return respBody, nil
+	var updates receive.UpdateResultType
+	err = json.Unmarshal(response, &updates)
+	if err != nil {
+		return nil, err
+	}
+	return &updates, nil
+}
+
+func sendResponse(message *send.SendType) (*receive.SendResult, error) {
+	response, err := post(message)
+	if err != nil {
+		return nil, err
+	}
+	var sendResult receive.SendResult
+	err = json.Unmarshal(response, &sendResult)
+	if err != nil {
+		/*if message.Type == send.SEND_TYPE_GET {
+			err = nil
+		}*/
+		return nil, err
+	}
+	return &sendResult, nil
 }
 
 func (b *botImpl) run() {
@@ -76,22 +103,16 @@ func (b *botImpl) run() {
 				b.logger.Infof("Update-polling goroutine exiting")
 				return
 			default:
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(b.period)
 			}
-			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID+1, 0, 0)
+			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID + 1, 0, 0)
 			if err != nil {
 				b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
 				continue
 			}
-			response, err := post(getUpdatesRequest)
-			var updates receive.UpdateResultType
+			updates, err := poll(getUpdatesRequest)
 			if err != nil {
 				b.logger.Errorf("Failed to pull updates. Error: %v.", err)
-				continue
-			}
-			err = json.Unmarshal(response, &updates)
-			if err != nil {
-				b.logger.Errorf("Failed to unmarshal. Error: %v.\n", err)
 				continue
 			}
 			if !updates.Ok {
@@ -101,14 +122,6 @@ func (b *botImpl) run() {
 			if len(updates.Updates) <= 0 {
 				continue
 			}
-
-			/*indented, err := json.MarshalIndent(&updates, "", "    ")
-			if err != nil {
-				fmt.Printf("Failed to indent... Error: %v.\n", err)
-			} else {
-				fmt.Println(string(indented))
-			}*/
-
 			for updateIndex := range updates.Updates {
 				lastUpdate := updates.Updates[updateIndex]
 				index := lastUpdate.ID
@@ -123,20 +136,24 @@ func (b *botImpl) run() {
 				if response == nil {
 					continue
 				}
-				responseSentResult, err := post(response)
+				responseSentResult, err := sendResponse(response)
 				if err != nil {
 					b.logger.Errorf("Failed to send response for update id '%d'. Error: %v.", lastUpdate.ID, err)
 					continue
 				}
-				b.logger.Infof("Sent response: %s", string(responseSentResult))
+				if !responseSentResult.Ok {
+					b.logger.Errorf("Failed to send response for update id '%d'. Received error: code - '%d', description '%s'.", lastUpdate.ID, responseSentResult.ErrorCode, responseSentResult.Description)
+				} else {
+					b.logger.Infof("Response sent.")
+				}
 			}
 		}
 	}()
 }
 
-func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, logger Logger) Bot {
+func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPeriodMs int64, logger Logger) Bot {
 	stopUpdatesChan := make(chan struct{})
-	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate}
+	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate, period: time.Duration(pollPeriodMs) * time.Millisecond}
 	bot.run()
 	return &bot
 }
