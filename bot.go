@@ -31,7 +31,7 @@ type botImpl struct {
 	logger   Logger
 	factory  *send.RequestFactory
 	OnUpdate UpdateCallback
-	period	time.Duration
+	period   time.Duration
 }
 
 func (b *botImpl) Stop() {
@@ -105,7 +105,7 @@ func (b *botImpl) run() {
 			default:
 				time.Sleep(b.period)
 			}
-			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID + 1, 0, 0)
+			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID+1, 0, 0)
 			if err != nil {
 				b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
 				continue
