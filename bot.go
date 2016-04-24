@@ -10,14 +10,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+	"runtime/debug"
 )
-
-type Logger interface {
-	Warningf(format string, args ...interface{})
-	Debugf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
-}
 
 type UpdateCallback func(update *receive.UpdateType) (*send.SendType, error)
 
@@ -105,50 +99,68 @@ func (b *botImpl) run() {
 			default:
 				time.Sleep(b.period)
 			}
-			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID+1, 0, 0)
-			if err != nil {
-				b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
-				continue
-			}
-			updates, err := poll(getUpdatesRequest)
-			if err != nil {
-				b.logger.Errorf("Failed to pull updates. Error: %v.", err)
-				continue
-			}
-			if !updates.Ok {
-				b.logger.Errorf("Bad updates object...")
-				continue
-			}
-			if len(updates.Updates) <= 0 {
-				continue
-			}
-			for updateIndex := range updates.Updates {
-				lastUpdate := updates.Updates[updateIndex]
-				index := lastUpdate.ID
-				if index > lastUpdateID {
-					lastUpdateID = index
-				}
-				response, err := b.OnUpdate(&lastUpdate)
-				if err != nil {
-					b.logger.Errorf("Failed to process update id '%d'. Error: %v.", lastUpdate.ID, err)
-					continue
-				}
-				if response == nil {
-					continue
-				}
-				responseSentResult, err := sendResponse(response)
-				if err != nil {
-					b.logger.Errorf("Failed to send response for update id '%d'. Error: %v.", lastUpdate.ID, err)
-					continue
-				}
-				if !responseSentResult.Ok {
-					b.logger.Errorf("Failed to send response for update id '%d'. Received error: code - '%d', description '%s'.", lastUpdate.ID, responseSentResult.ErrorCode, responseSentResult.Description)
-				} else {
-					b.logger.Infof("Response sent.")
-				}
-			}
+			lastUpdateID = b.pollIteration(lastUpdateID)
 		}
 	}()
+}
+
+func (b *botImpl) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
+	lastUpdateID = currentUpdateID
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		err, ok := r.(error)
+		if ok {
+			b.logger.Errorf("PANIC occured. Error: %v. Call-Stack:\n%s.", err, string(debug.Stack()))
+		} else {
+			b.logger.Errorf("PANIC occured. Recover-objet: %+v. Call-Stack:\n%s.", r, string(debug.Stack()))
+		}
+	}()
+	getUpdatesRequest, err := b.factory.NewGetUpdates(currentUpdateID+1, 0, 0)
+	if err != nil {
+		b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
+		return
+	}
+	updates, err := poll(getUpdatesRequest)
+	if err != nil {
+		b.logger.Errorf("Failed to pull updates. Error: %v.", err)
+		return
+	}
+	if !updates.Ok {
+		b.logger.Errorf("Bad updates object...")
+		return
+	}
+	if len(updates.Updates) <= 0 {
+		return
+	}
+	for updateIndex := range updates.Updates {
+		lastUpdate := updates.Updates[updateIndex]
+		index := lastUpdate.ID
+		if index > lastUpdateID {
+			lastUpdateID = index
+		}
+		response, err := b.OnUpdate(&lastUpdate)
+		if err != nil {
+			b.logger.Errorf("Failed to process update id '%d'. Error: %v.", lastUpdate.ID, err)
+			continue
+		}
+		if response == nil {
+			continue
+		}
+		responseSentResult, err := sendResponse(response)
+		if err != nil {
+			b.logger.Errorf("Failed to send response for update id '%d'. Error: %v.", lastUpdate.ID, err)
+			continue
+		}
+		if !responseSentResult.Ok {
+			b.logger.Errorf("Failed to send response for update id '%d'. Received error: code - '%d', description '%s'.", lastUpdate.ID, responseSentResult.ErrorCode, responseSentResult.Description)
+		} else {
+			b.logger.Infof("Response sent.")
+		}
+	}
+	return
 }
 
 func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPeriodMs int64, logger Logger) Bot {
@@ -156,30 +168,4 @@ func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPe
 	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate, period: time.Duration(pollPeriodMs) * time.Millisecond}
 	bot.run()
 	return &bot
-}
-
-type StdoutLogger struct {
-}
-
-func (l *StdoutLogger) print(prefix string, format string, args ...interface{}) {
-	fmt.Printf(prefix+format+"\n", args...)
-}
-
-func (l *StdoutLogger) Warningf(format string, args ...interface{}) {
-	l.print("[WARNING] ", format, args...)
-}
-func (l *StdoutLogger) Debugf(format string, args ...interface{}) {
-	l.print("[DEBUG] ", format, args...)
-}
-
-func (l *StdoutLogger) Errorf(format string, args ...interface{}) {
-	l.print("[ERROR] ", format, args...)
-}
-
-func (l *StdoutLogger) Infof(format string, args ...interface{}) {
-	l.print("[INFO] ", format, args...)
-}
-
-func NewStdoutLogger() Logger {
-	return &StdoutLogger{}
 }
