@@ -1,15 +1,15 @@
 package telebot
 
 import (
-	"github.com/coldze/telebot/send"
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/coldze/telebot/receive"
-	"net/http"
-	"bytes"
+	"github.com/coldze/telebot/send"
 	"io/ioutil"
-	"encoding/json"
+	"net/http"
 	"time"
-	"errors"
 )
 
 type Logger interface {
@@ -27,9 +27,9 @@ type Bot interface {
 }
 
 type botImpl struct {
-	stopBot chan struct{}
-	logger Logger
-	factory *send.RequestFactory
+	stopBot  chan struct{}
+	logger   Logger
+	factory  *send.RequestFactory
 	OnUpdate UpdateCallback
 }
 
@@ -68,7 +68,7 @@ func post(message *send.SendType) (result []byte, err error) {
 }
 
 func (b *botImpl) run() {
-	go func () {
+	go func() {
 		var lastUpdateID int64
 		for {
 			select {
@@ -78,7 +78,7 @@ func (b *botImpl) run() {
 			default:
 				time.Sleep(500 * time.Millisecond)
 			}
-			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID + 1, 0, 0)
+			getUpdatesRequest, err := b.factory.NewGetUpdates(lastUpdateID+1, 0, 0)
 			if err != nil {
 				b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
 				continue
@@ -131,7 +131,7 @@ func (b *botImpl) run() {
 				b.logger.Infof("Sent response: %s", string(responseSentResult))
 			}
 		}
-	} ()
+	}()
 }
 
 func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, logger Logger) Bot {
@@ -145,21 +145,21 @@ type StdoutLogger struct {
 }
 
 func (l *StdoutLogger) print(prefix string, format string, args ...interface{}) {
-	fmt.Printf(prefix + format + "\n", args...)
+	fmt.Printf(prefix+format+"\n", args...)
 }
 
 func (l *StdoutLogger) Warningf(format string, args ...interface{}) {
 	l.print("[WARNING] ", format, args...)
 }
-func (l* StdoutLogger) Debugf(format string, args ...interface{}) {
+func (l *StdoutLogger) Debugf(format string, args ...interface{}) {
 	l.print("[DEBUG] ", format, args...)
 }
 
-func (l* StdoutLogger) Errorf(format string, args ...interface{}) {
+func (l *StdoutLogger) Errorf(format string, args ...interface{}) {
 	l.print("[ERROR] ", format, args...)
 }
 
-func (l* StdoutLogger) Infof(format string, args ...interface{}) {
+func (l *StdoutLogger) Infof(format string, args ...interface{}) {
 	l.print("[INFO] ", format, args...)
 }
 

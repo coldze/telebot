@@ -90,8 +90,8 @@ func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode
 
 func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error) {
 	val := send_requests.GetUpdatesType{
-		Offset: offset,
-		Limit: limit,
+		Offset:  offset,
+		Limit:   limit,
 		Timeout: timeout}
 	return f.newPostSendType(f.getUpdatesURL, val)
 }
