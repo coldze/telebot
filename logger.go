@@ -34,4 +34,3 @@ func (l *StdoutLogger) Infof(format string, args ...interface{}) {
 func NewStdoutLogger() Logger {
 	return &StdoutLogger{}
 }
-

@@ -9,8 +9,8 @@ import (
 	"github.com/coldze/telebot/send"
 	"io/ioutil"
 	"net/http"
-	"time"
 	"runtime/debug"
+	"time"
 )
 
 type UpdateCallback func(update *receive.UpdateType) (*send.SendType, error)

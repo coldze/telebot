@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"github.com/coldze/telebot/send"
-	"github.com/coldze/telebot/receive"
-	"github.com/coldze/telebot"
 	"encoding/json"
+	"fmt"
+	"github.com/coldze/telebot"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
+	"os"
 )
 
 const (
@@ -23,7 +23,7 @@ func main() {
 	factory := send.NewRequestFactory(botToken)
 	logger.Infof("Available bot functionality:\n%v", factory)
 	logger.Infof("Request factory intialized.")
-	onUpdate := func (update *receive.UpdateType) (*send.SendType, error) {
+	onUpdate := func(update *receive.UpdateType) (*send.SendType, error) {
 		if update == nil {
 			return nil, nil
 		}
@@ -40,7 +40,7 @@ func main() {
 		if update.Message.Sticker != nil {
 			request, err = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), "BQADAgADQAADyIsGAAGMQCvHaYLU_AI", false, 0, nil)
 		} else {
-			request, err = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n" + update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+			request, err = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
 		if err != nil {
 			return nil, err
