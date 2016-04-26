@@ -1,10 +1,10 @@
 package telebot
 
 import (
-	"github.com/coldze/telebot/receive"
-	"strings"
-	"github.com/coldze/telebot/send"
 	"errors"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
+	"strings"
 )
 
 func parseCommand(update *receive.UpdateType) (*CommandCallType, string) {
@@ -31,7 +31,7 @@ func NewDefaultUpdateCallback(logger Logger, handlers *BotHandlers) (UpdateCallb
 	if handlers == nil {
 		return nil, errors.New("Invalid handlers specified.")
 	}
-	return func (update *receive.UpdateType) (*send.SendType, error) {
+	return func(update *receive.UpdateType) (*send.SendType, error) {
 		if update == nil {
 			return nil, nil
 		}
