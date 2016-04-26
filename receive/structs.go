@@ -1,16 +1,16 @@
 package receive
 
 const (
-	ENTITY_TYPE_MENTION = "mention"
-	ENTITY_TYPE_HASH_TAG = "hashtag"
+	ENTITY_TYPE_MENTION     = "mention"
+	ENTITY_TYPE_HASH_TAG    = "hashtag"
 	ENTITY_TYPE_BOT_COMMAND = "bot_command"
-	ENTITY_TYPE_URL = "url"
-	ENTITY_TYPE_EMAIL = "email"
-	ENTITY_TYPE_BOLD = "bold"
-	ENTITY_TYPE_ITALIC = "italic"
-	ENTITY_TYPE_CODE = "code"
-	ENTITY_TYPE_PRE = "pre"
-	ENTITY_TYPE_TEXT_LINK = "text_link"
+	ENTITY_TYPE_URL         = "url"
+	ENTITY_TYPE_EMAIL       = "email"
+	ENTITY_TYPE_BOLD        = "bold"
+	ENTITY_TYPE_ITALIC      = "italic"
+	ENTITY_TYPE_CODE        = "code"
+	ENTITY_TYPE_PRE         = "pre"
+	ENTITY_TYPE_TEXT_LINK   = "text_link"
 )
 
 type MessageEntityType struct {

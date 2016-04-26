@@ -1,10 +1,10 @@
 package telebot
 
 import (
-	"fmt"
-	"github.com/coldze/telebot/send"
-	"github.com/coldze/telebot/receive"
 	"errors"
+	"fmt"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
 )
 
 type CommandCallType struct {
