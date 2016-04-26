@@ -1,14 +1,14 @@
 package main
 
 import (
-	"github.com/coldze/telebot/receive"
-	"github.com/coldze/telebot/send"
+	"bytes"
+	"errors"
 	"fmt"
 	"github.com/coldze/telebot"
-	"strings"
-	"errors"
-	"bytes"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
 	"os"
+	"strings"
 )
 
 const (
@@ -19,7 +19,7 @@ type UsersMemory struct {
 	Memorized map[int64][]string
 }
 
-func NewUsersMemory() *UsersMemory{
+func NewUsersMemory() *UsersMemory {
 	return &UsersMemory{Memorized: make(map[int64][]string)}
 }
 
@@ -30,7 +30,7 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *telebot.CommandCallType)(*send.SendType, error) {
+	return func(command *telebot.CommandCallType) (*send.SendType, error) {
 		logger.Infof("Remember command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -59,7 +59,7 @@ func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, l
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *telebot.CommandCallType)(*send.SendType, error) {
+	return func(command *telebot.CommandCallType) (*send.SendType, error) {
 		logger.Infof("List command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -94,11 +94,11 @@ func main() {
 	requestFactory := send.NewRequestFactory(botToken)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
-	onMessage := func (update *receive.UpdateType) (result *send.SendType, err error) {
+	onMessage := func(update *receive.UpdateType) (result *send.SendType, err error) {
 		if update.Message.Sticker != nil {
 			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), "BQADAgADQAADyIsGAAGMQCvHaYLU_AI", false, 0, nil)
 		} else {
-			result, err = requestFactory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n" + update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+			result, err = requestFactory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
 		logger.Debugf("Response: %v.", string(result.Parameters))
 		return
