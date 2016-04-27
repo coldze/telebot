@@ -1,3 +1,3 @@
 # Framework for making Telegram bots
 
-That's all for now :)
+* Currently only polling mode bot is available
