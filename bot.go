@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"net/url"
+	"os"
 	"runtime/debug"
 	"time"
 )
@@ -104,6 +108,97 @@ func (b *botImpl) run() {
 	}()
 }
 
+func (b *botImpl) singUp(listenUrl string, port int64, sslPrivateKey string, sslPublicKey string) error {
+	testFunc := func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			b.logger.Errorf("Failed to read update object")
+			return
+		}
+		b.logger.Infof("Update body: %s", string(body))
+		var update receive.UpdateType
+		err = json.Unmarshal(body, &update)
+		if err != nil {
+			b.logger.Errorf("Failed to unmarshal update object")
+			return
+		}
+		response, err := b.OnUpdate(&update)
+		if err != nil {
+			b.logger.Errorf("Failed to process update id '%d'. Error: %v.", update.ID, err)
+			return
+		}
+		if response == nil {
+			return
+		}
+		responseSentResult, err := sendResponse(response)
+		if err != nil {
+			b.logger.Errorf("Failed to send response for update id '%d'. Error: %v.", update.ID, err)
+			return
+		}
+		if !responseSentResult.Ok {
+			b.logger.Errorf("Failed to send response for update id '%d'. Received error: code - '%d', description '%s'.", update.ID, responseSentResult.ErrorCode, responseSentResult.Description)
+		} else {
+			b.logger.Infof("Response sent.")
+		}
+	}
+	u, err := url.Parse(listenUrl)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(u.Path)
+
+	http.HandleFunc(u.Path, testFunc)
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	f, err := os.Open(sslPublicKey)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	fw, err := w.CreateFormFile("certificate", sslPublicKey)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(fw, f); err != nil {
+		return err
+	}
+	if fw, err = w.CreateFormField("url"); err != nil {
+		return err
+	}
+	if _, err = fw.Write([]byte(listenUrl)); err != nil {
+		return err
+	}
+
+	w.Close()
+
+	req, err := http.NewRequest("POST", b.factory.SetWebhookURL, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if res != nil {
+		defer res.Body.Close()
+	}
+	if err != nil {
+		return err
+	}
+	resText, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	b.logger.Infof("Web-hook sign-up result: %s", string(resText))
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", res.Status)
+	}
+	return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
+}
+
 func (b *botImpl) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
 	lastUpdateID = currentUpdateID
 	defer func() {
@@ -168,4 +263,14 @@ func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPe
 	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate, period: time.Duration(pollPeriodMs) * time.Millisecond}
 	bot.run()
 	return &bot
+}
+
+func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, logger Logger) (Bot, error) {
+	stopUpdatesChan := make(chan struct{})
+	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate}
+	err := bot.singUp(url, listenPort, sslPrivateKey, sslPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return &bot, nil
 }

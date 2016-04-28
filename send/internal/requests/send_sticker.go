@@ -7,3 +7,7 @@ type SendSticker struct {
 	ReplyToMessageID    int64       `json:"reply_to_message_id"`
 	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`
 }
+
+type SignUp struct {
+	URL string `json:"url"`
+}

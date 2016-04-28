@@ -18,6 +18,7 @@ const (
 	bot_query_fmt = "https://api.telegram.org/bot%s/"
 
 	cmd_get_updates             = "%sgetUpdates"
+	cmd_set_web_hook            = "%ssetWebhook"
 	cmd_get_me                  = "%sgetMe"
 	cmd_send_message            = "%ssendMessage"
 	cmd_forward_message         = "%sforwardMessage"
@@ -42,6 +43,7 @@ type RequestFactory struct {
 	sendStickerURL string
 	sendMessageURL string
 	getUpdatesURL  string
+	SetWebhookURL  string
 }
 
 func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType, error) {
@@ -67,6 +69,10 @@ func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bo
 		DisableNotification: notify,
 		ReplyToMessageID:    replyToMessageID}
 	return f.newPostSendType(f.sendStickerURL, stickerMessage)
+}
+
+func (f *RequestFactory) NewSignUp(url string) (*SendType, error) {
+	return f.newPostSendType(f.SetWebhookURL, send_requests.SignUp{URL: url})
 }
 
 func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -106,5 +112,6 @@ func NewRequestFactory(botToken string) *RequestFactory {
 	factory.sendMessageURL = fmt.Sprintf(cmd_send_message, botRequestUrl)
 	factory.sendStickerURL = fmt.Sprintf(cmd_send_sticker, botRequestUrl)
 	factory.getUpdatesURL = fmt.Sprintf(cmd_get_updates, botRequestUrl)
+	factory.SetWebhookURL = fmt.Sprintf(cmd_set_web_hook, botRequestUrl)
 	return &factory
 }
