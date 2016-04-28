@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"time"
@@ -107,20 +108,10 @@ func (b *botImpl) run() {
 	}()
 }
 
-func (b *botImpl) singUp() error {
+func (b *botImpl) singUp(listenUrl string, port int64, sslPrivateKey string, sslPublicKey string) error {
 	testFunc := func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		body, err := ioutil.ReadAll(r.Body)
-		/*r.ParseForm()  // parse arguments, you have to call this by yourself
-		fmt.Println(r.Form)  // print form information in server side
-		fmt.Println("path", r.URL.Path)
-		fmt.Println("scheme", r.URL.Scheme)
-		fmt.Println(r.Form["url_long"])
-		for k, v := range r.Form {
-			fmt.Println("key:", k)
-			fmt.Println("val:", strings.Join(v, ""))
-		}
-		fmt.Fprintf(w, "Hello astaxie!") // send data to client side*/
 		if err != nil {
 			b.logger.Errorf("Failed to read update object")
 			return
@@ -151,16 +142,23 @@ func (b *botImpl) singUp() error {
 			b.logger.Infof("Response sent.")
 		}
 	}
-	http.HandleFunc("/handle_updates", testFunc) // set router
+	u, err := url.Parse(listenUrl)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(u.Path)
+
+	http.HandleFunc(u.Path, testFunc)
 
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
-	f, err := os.Open("public.pem")
+	f, err := os.Open(sslPublicKey)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	fw, err := w.CreateFormFile("certificate", "public.pem")
+	fw, err := w.CreateFormFile("certificate", sslPublicKey)
 	if err != nil {
 		return err
 	}
@@ -170,7 +168,7 @@ func (b *botImpl) singUp() error {
 	if fw, err = w.CreateFormField("url"); err != nil {
 		return err
 	}
-	if _, err = fw.Write([]byte("https://coldze.ddns.net:80/handle_updates")); err != nil {
+	if _, err = fw.Write([]byte(listenUrl)); err != nil {
 		return err
 	}
 
@@ -180,10 +178,8 @@ func (b *botImpl) singUp() error {
 	if err != nil {
 		return err
 	}
-	// Don't forget to set the content type, this will contain the boundary.
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
-	// Submit the request
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if res != nil {
@@ -197,21 +193,10 @@ func (b *botImpl) singUp() error {
 		return err
 	}
 	b.logger.Infof("Web-hook sign-up result: %s", string(resText))
-
-	// Check the response
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status: %s", res.Status)
 	}
-	/*req, err := b.factory.NewSignUp("https://coldze.ddns.net/handle_updates")
-	if err != nil {
-		return err
-	}
-	res, err := post(req)
-	if err != nil {
-		return err
-	}
-	b.logger.Infof("Web-hook sign-up result: %s", string(res))*/
-	return http.ListenAndServeTLS(":3000", "public.pem", "private.key", nil) // set listen port
+	return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
 }
 
 func (b *botImpl) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
@@ -280,10 +265,10 @@ func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPe
 	return &bot
 }
 
-func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, logger Logger) (Bot, error) {
+func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, logger Logger) (Bot, error) {
 	stopUpdatesChan := make(chan struct{})
-	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate, period: time.Duration(1000) * time.Millisecond}
-	err := bot.singUp()
+	bot := botImpl{stopBot: stopUpdatesChan, logger: logger, factory: factory, OnUpdate: onUpdate}
+	err := bot.singUp(url, listenPort, sslPrivateKey, sslPublicKey)
 	if err != nil {
 		return nil, err
 	}
