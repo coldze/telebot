@@ -26,6 +26,15 @@ func (b *pollingBot) Send(*send.SendType) error {
 
 func (b *pollingBot) run() {
 	go func() {
+		unsubscribe, err := b.factory.NewUnsubscribe()
+		if err != nil {
+			b.logger.Errorf("Failed to create unsubscribe request. Error: %v.", err)
+		} else {
+			_, err = sendRequest(unsubscribe)
+			if err != nil {
+				b.logger.Errorf("Failed to unsubscribe. Error: %v.", err)
+			}
+		}
 		var lastUpdateID int64
 		for {
 			select {

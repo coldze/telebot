@@ -50,7 +50,7 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 	}
 
 	http.HandleFunc(u.Path, testFunc)
-	signUp, err := b.factory.NewSignUp(listenUrl, sslPublicKey)
+	signUp, err := b.factory.NewSubscribe(listenUrl, sslPublicKey)
 	if err != nil {
 		return err
 	}

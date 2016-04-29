@@ -61,11 +61,15 @@ func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType,
 }
 
 func (f *RequestFactory) newPostSendType(url string, message interface{}, contentType string) (*SendType, error) {
-	params, ok := message.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("Invalid input message type. Expected []byte, got: %T", message)
+	requestMessage, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
 	}
-	return &SendType{URL: url, Parameters: params, Type: SEND_TYPE_POST, ContentType: contentType}, nil
+	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST}, nil
+}
+
+func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, contentType string) (*SendType, error) {
+	return &SendType{URL: url, Parameters: message, Type: SEND_TYPE_POST, ContentType: contentType}, nil
 }
 
 func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -77,29 +81,36 @@ func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bo
 	return f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json)
 }
 
-func (f *RequestFactory) NewSignUp(url string, sslPublicKey string) (*SendType, error) {
+func (f *RequestFactory) NewUnsubscribe() (*SendType, error) {
+	return f.NewSubscribe("", "")
+}
+
+func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendType, error) {
 	var buf bytes.Buffer
 	bufferWriter := multipart.NewWriter(&buf)
-	sslCertificate, err := os.Open(sslPublicKey)
+	if len(sslPublicKey) > 0 {
+		sslCertificate, err := os.Open(sslPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		defer sslCertificate.Close()
+		fieldWriter, err := bufferWriter.CreateFormFile("certificate", sslPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = io.Copy(fieldWriter, sslCertificate); err != nil {
+			return nil, err
+		}
+	}
+	fieldWriter, err := bufferWriter.CreateFormField("url")
 	if err != nil {
 		return nil, err
 	}
-	defer sslCertificate.Close()
-	fieldWriter, err := bufferWriter.CreateFormFile("certificate", sslPublicKey)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = io.Copy(fieldWriter, sslCertificate); err != nil {
-		return nil, err
-	}
-	if fieldWriter, err = bufferWriter.CreateFormField("url"); err != nil {
-		return nil, err
-	}
-	if _, err = fieldWriter.Write([]byte(url)); err != nil {
+	if _, err := fieldWriter.Write([]byte(url)); err != nil {
 		return nil, err
 	}
 	bufferWriter.Close()
-	sendType, err := f.newPostSendType(f.SetWebhookURL, buf.Bytes(), content_type_application_json)
+	sendType, err := f.newPostSendTypeBytes(f.SetWebhookURL, buf.Bytes(), content_type_application_json)
 	if err != nil {
 		return nil, err
 	}

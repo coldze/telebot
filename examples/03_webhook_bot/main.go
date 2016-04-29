@@ -9,11 +9,16 @@ import (
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const (
-	BOT_TOKEN_KEY = "BOT_TOKEN"
+	BOT_TOKEN_KEY               = "BOT_TOKEN"
+	BOT_SSL_PUBLIC_KEY          = "BOT_SSL_PUBLIC"
+	BOT_SSL_PRIVATE_KEY         = "BOT_SSL_PRIVATE"
+	BOT_UPDATE_CALLBACK_URL_KEY = "BOT_UPDATE_CALLBACK_URL"
+	BOT_HTTPS_LISTEN_PORT_KEY   = "BOT_HTTPS_LISTEN_PORT"
 )
 
 type UsersMemory struct {
@@ -92,6 +97,37 @@ func main() {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
 		return
 	}
+
+	sslPublic, ok := os.LookupEnv(BOT_SSL_PUBLIC_KEY)
+	if !ok {
+		logger.Errorf("Failed to get ssl public key. Expected to have environment variable '%s'.", BOT_SSL_PUBLIC_KEY)
+		return
+	}
+
+	sslPrivate, ok := os.LookupEnv(BOT_SSL_PRIVATE_KEY)
+	if !ok {
+		logger.Errorf("Failed to get ssl private key. Expected to have environment variable '%s'.", BOT_SSL_PRIVATE_KEY)
+		return
+	}
+
+	updateCallbackURL, ok := os.LookupEnv(BOT_UPDATE_CALLBACK_URL_KEY)
+	if !ok {
+		logger.Errorf("Failed to get update callback URL. Expected to have environment variable '%s'.", BOT_UPDATE_CALLBACK_URL_KEY)
+		return
+	}
+
+	listenPortStr, ok := os.LookupEnv(BOT_HTTPS_LISTEN_PORT_KEY)
+	if !ok {
+		logger.Errorf("Failed to get listening port. Expected to have environment variable '%s'.", BOT_HTTPS_LISTEN_PORT_KEY)
+		return
+	}
+
+	listenPort, err := strconv.ParseInt(listenPortStr, 10, 64)
+	if err != nil {
+		logger.Errorf("Failed to get listening port. Error: %v.", err)
+		return
+	}
+
 	requestFactory := send.NewRequestFactory(botToken)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
@@ -128,8 +164,9 @@ func main() {
 		return
 	}
 
-	bot := bot.NewPollingBot(requestFactory, onUpdate, 1000, logger)
-	defer bot.Stop()
-	logger.Infof("Bot started. Press Enter to stop.")
-	_, _ = fmt.Scanf("\n")
+	_, err = bot.NewWebHookBot(requestFactory, onUpdate, updateCallbackURL, listenPort, sslPrivate, sslPublic, logger)
+	if err != nil {
+		logger.Errorf("Failed to start bot. Error: %v.", err)
+		return
+	}
 }
