@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/coldze/telebot"
+	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"os"
@@ -17,7 +18,7 @@ func main() {
 	logger := telebot.NewStdoutLogger()
 	botToken, ok := os.LookupEnv(BOT_TOKEN_KEY)
 	if !ok {
-		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", botToken)
+		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
 		return
 	}
 	factory := send.NewRequestFactory(botToken)
@@ -48,7 +49,7 @@ func main() {
 		logger.Debugf("Response: %v.", string(request.Parameters))
 		return request, nil
 	}
-	bot := telebot.NewPollingBot(factory, onUpdate, 1000, logger)
+	bot := bot.NewPollingBot(factory, onUpdate, 1000, logger)
 	defer bot.Stop()
 	logger.Infof("Bot started. Press Enter to stop.")
 	_, _ = fmt.Scanf("\n")
