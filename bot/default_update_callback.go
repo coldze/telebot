@@ -1,7 +1,8 @@
-package telebot
+package bot
 
 import (
 	"errors"
+	"github.com/coldze/telebot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"strings"
@@ -24,7 +25,7 @@ func parseCommand(update *receive.UpdateType) (*CommandCallType, string) {
 	return nil, ""
 }
 
-func NewDefaultUpdateCallback(logger Logger, handlers *BotHandlers) (UpdateCallback, error) {
+func NewDefaultUpdateCallback(logger telebot.Logger, handlers *BotHandlers) (UpdateCallback, error) {
 	if logger == nil {
 		return nil, errors.New("Invalid logger specified.")
 	}

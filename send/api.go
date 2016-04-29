@@ -6,9 +6,10 @@ const (
 )
 
 type SendType struct {
-	URL        string
-	Type       int64
-	Parameters []byte
+	URL         string
+	Type        int64
+	Parameters  []byte
+	ContentType string
 }
 
 type RequestSender interface {

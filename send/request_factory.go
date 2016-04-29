@@ -1,9 +1,13 @@
 package send
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/coldze/telebot/send/internal/requests"
+	"io"
+	"mime/multipart"
+	"os"
 )
 
 const (
@@ -37,6 +41,8 @@ const (
 	cmd_kick_chat_member        = "%skickChatMember"
 	cmd_unban_chat_member       = "%sunbanChatMember"
 	cmd_answer_callback_query   = "%sanswerCallbackQuery"
+
+	content_type_application_json = "application/json"
 )
 
 type RequestFactory struct {
@@ -54,12 +60,12 @@ func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType,
 	return &SendType{URL: f.sendStickerURL, Parameters: request}, nil
 }
 
-func (f *RequestFactory) newPostSendType(url string, message interface{}) (*SendType, error) {
-	requestMessage, err := json.Marshal(message)
-	if err != nil {
-		return nil, err
+func (f *RequestFactory) newPostSendType(url string, message interface{}, contentType string) (*SendType, error) {
+	params, ok := message.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("Invalid input message type. Expected []byte, got: %T", message)
 	}
-	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST}, nil
+	return &SendType{URL: url, Parameters: params, Type: SEND_TYPE_POST, ContentType: contentType}, nil
 }
 
 func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -68,11 +74,37 @@ func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bo
 		Sticker:             sticker,
 		DisableNotification: notify,
 		ReplyToMessageID:    replyToMessageID}
-	return f.newPostSendType(f.sendStickerURL, stickerMessage)
+	return f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json)
 }
 
-func (f *RequestFactory) NewSignUp(url string) (*SendType, error) {
-	return f.newPostSendType(f.SetWebhookURL, send_requests.SignUp{URL: url})
+func (f *RequestFactory) NewSignUp(url string, sslPublicKey string) (*SendType, error) {
+	var buf bytes.Buffer
+	bufferWriter := multipart.NewWriter(&buf)
+	sslCertificate, err := os.Open(sslPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	defer sslCertificate.Close()
+	fieldWriter, err := bufferWriter.CreateFormFile("certificate", sslPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = io.Copy(fieldWriter, sslCertificate); err != nil {
+		return nil, err
+	}
+	if fieldWriter, err = bufferWriter.CreateFormField("url"); err != nil {
+		return nil, err
+	}
+	if _, err = fieldWriter.Write([]byte(url)); err != nil {
+		return nil, err
+	}
+	bufferWriter.Close()
+	sendType, err := f.newPostSendType(f.SetWebhookURL, buf.Bytes(), content_type_application_json)
+	if err != nil {
+		return nil, err
+	}
+	sendType.ContentType = bufferWriter.FormDataContentType()
+	return sendType, nil
 }
 
 func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -91,7 +123,7 @@ func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode
 		DisableNotification:   disableNotifications,
 		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           markup}
-	return f.newPostSendType(f.sendMessageURL, sendMessage)
+	return f.newPostSendType(f.sendMessageURL, sendMessage, content_type_application_json)
 }
 
 func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error) {
@@ -99,7 +131,7 @@ func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64)
 		Offset:  offset,
 		Limit:   limit,
 		Timeout: timeout}
-	return f.newPostSendType(f.getUpdatesURL, val)
+	return f.newPostSendType(f.getUpdatesURL, val, content_type_application_json)
 }
 
 func (f *RequestFactory) String() string {
