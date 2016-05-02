@@ -65,7 +65,7 @@ func (f *RequestFactory) newPostSendType(url string, message interface{}, conten
 	if err != nil {
 		return nil, err
 	}
-	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST}, nil
+	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST, ContentType: contentType}, nil
 }
 
 func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, contentType string) (*SendType, error) {
