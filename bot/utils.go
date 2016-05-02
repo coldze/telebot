@@ -30,10 +30,11 @@ func sendRequest(message *send.SendType) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	replyBody, err := ioutil.ReadAll(reply.Body)
 	if reply.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Responded bad status: %s", reply.Status)
+		return nil, fmt.Errorf("Responded bad status: %s. Body: %s", reply.Status, string(replyBody))
 	}
-	return ioutil.ReadAll(reply.Body)
+	return replyBody, err
 }
 
 func poll(message *send.SendType) (*receive.UpdateResultType, error) {
