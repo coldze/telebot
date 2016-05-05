@@ -2,7 +2,6 @@ package bot
 
 import (
 	"errors"
-	"fmt"
 	"github.com/coldze/telebot"
 	"github.com/coldze/telebot/receive"
 )
@@ -24,9 +23,8 @@ func (u *SyncUpdateProcessor) Process(update *receive.UpdateType) error {
 	if err != nil {
 		return err
 	}
-	if responseSentResult.Ok {
-		u.logger.Infof("Response sent.")
-		return nil
+	if response.Callback != nil {
+		response.Callback(responseSentResult)
 	}
-	return fmt.Errorf("Failed to send response for update id '%d'. Received error: code - '%d', description '%s'.", update.ID, responseSentResult.ErrorCode, responseSentResult.Description)
+	return nil
 }

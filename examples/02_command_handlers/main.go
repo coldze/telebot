@@ -92,7 +92,7 @@ func main() {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
 		return
 	}
-	requestFactory := send.NewRequestFactory(botToken)
+	requestFactory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
 	onMessage := func(update *receive.UpdateType) (result *send.SendType, err error) {
