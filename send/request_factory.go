@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+	"errors"
 )
 
 const (
@@ -48,6 +49,7 @@ const (
 type RequestFactory struct {
 	sendStickerURL string
 	sendMessageURL string
+	sendPhotoURL string
 	getUpdatesURL  string
 	SetWebhookURL  string
 }
@@ -110,12 +112,37 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendTyp
 		return nil, err
 	}
 	bufferWriter.Close()
-	sendType, err := f.newPostSendTypeBytes(f.SetWebhookURL, buf.Bytes(), content_type_application_json)
+	return f.newPostSendTypeBytes(f.SetWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType())
+}
+
+func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}) (*SendType, error) {
+	var buf bytes.Buffer
+	bufferWriter := multipart.NewWriter(&buf)
+	if len(photo) <= 0 {
+		return nil, errors.New("No photo to upload")
+	}
+	photoFile, err := os.Open(photo)
 	if err != nil {
 		return nil, err
 	}
-	sendType.ContentType = bufferWriter.FormDataContentType()
-	return sendType, nil
+	defer photoFile.Close()
+	fieldWriter, err := bufferWriter.CreateFormFile("photo", photo)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = io.Copy(fieldWriter, photoFile); err != nil {
+		return nil, err
+	}
+
+	fieldWriter, err = bufferWriter.CreateFormField("chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := fieldWriter.Write([]byte(chatID)); err != nil {
+		return nil, err
+	}
+	bufferWriter.Close()
+	return f.newPostSendTypeBytes(f.sendPhotoURL, buf.Bytes(), bufferWriter.FormDataContentType())
 }
 
 func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -156,5 +183,6 @@ func NewRequestFactory(botToken string) *RequestFactory {
 	factory.sendStickerURL = fmt.Sprintf(cmd_send_sticker, botRequestUrl)
 	factory.getUpdatesURL = fmt.Sprintf(cmd_get_updates, botRequestUrl)
 	factory.SetWebhookURL = fmt.Sprintf(cmd_set_web_hook, botRequestUrl)
+	factory.sendPhotoURL = fmt.Sprintf(cmd_send_photo, botRequestUrl)
 	return &factory
 }
