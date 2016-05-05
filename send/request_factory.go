@@ -3,12 +3,14 @@ package send
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/coldze/telebot"
+	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send/internal/requests"
 	"io"
 	"mime/multipart"
 	"os"
-	"errors"
 )
 
 const (
@@ -47,11 +49,12 @@ const (
 )
 
 type RequestFactory struct {
-	sendStickerURL string
-	sendMessageURL string
-	sendPhotoURL string
-	getUpdatesURL  string
-	SetWebhookURL  string
+	sendStickerURL  string
+	sendMessageURL  string
+	sendPhotoURL    string
+	getUpdatesURL   string
+	defaultCallback OnSentCallback
+	setWebhookURL   string
 }
 
 func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType, error) {
@@ -62,16 +65,19 @@ func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType,
 	return &SendType{URL: f.sendStickerURL, Parameters: request}, nil
 }
 
-func (f *RequestFactory) newPostSendType(url string, message interface{}, contentType string) (*SendType, error) {
+func (f *RequestFactory) newPostSendType(url string, message interface{}, contentType string, callback OnSentCallback) (*SendType, error) {
 	requestMessage, err := json.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
-	return &SendType{URL: url, Parameters: requestMessage, Type: SEND_TYPE_POST, ContentType: contentType}, nil
+	return f.newPostSendTypeBytes(url, requestMessage, contentType, callback)
 }
 
-func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, contentType string) (*SendType, error) {
-	return &SendType{URL: url, Parameters: message, Type: SEND_TYPE_POST, ContentType: contentType}, nil
+func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, contentType string, callback OnSentCallback) (*SendType, error) {
+	if callback == nil {
+		return &SendType{URL: url, Parameters: message, Type: SEND_TYPE_POST, ContentType: contentType, Callback: f.defaultCallback}, nil
+	}
+	return &SendType{URL: url, Parameters: message, Type: SEND_TYPE_POST, ContentType: contentType, Callback: callback}, nil
 }
 
 func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -80,7 +86,7 @@ func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bo
 		Sticker:             sticker,
 		DisableNotification: notify,
 		ReplyToMessageID:    replyToMessageID}
-	return f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json)
+	return f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json, nil)
 }
 
 func (f *RequestFactory) NewUnsubscribe() (*SendType, error) {
@@ -112,10 +118,10 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendTyp
 		return nil, err
 	}
 	bufferWriter.Close()
-	return f.newPostSendTypeBytes(f.SetWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType())
+	return f.newPostSendTypeBytes(f.setWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType(), nil)
 }
 
-func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}) (*SendType, error) {
+func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, notify bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
 	var buf bytes.Buffer
 	bufferWriter := multipart.NewWriter(&buf)
 	if len(photo) <= 0 {
@@ -142,7 +148,17 @@ func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption str
 		return nil, err
 	}
 	bufferWriter.Close()
-	return f.newPostSendTypeBytes(f.sendPhotoURL, buf.Bytes(), bufferWriter.FormDataContentType())
+	return f.newPostSendTypeBytes(f.sendPhotoURL, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
+}
+
+func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption string, notify bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
+	sendPhotoRequest := send_requests.SendPhoto{
+		ChatID:              chatID,
+		Photo:               photo,
+		DisableNotification: notify,
+		ReplyToMessageID:    replyToMessageID,
+		ReplyMarkup:         replyMarkup}
+	return f.newPostSendType(f.sendPhotoURL, sendPhotoRequest, content_type_application_json, callback)
 }
 
 func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
@@ -161,7 +177,7 @@ func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode
 		DisableNotification:   disableNotifications,
 		ReplyToMessageID:      replyToMessageID,
 		ReplyMarkup:           markup}
-	return f.newPostSendType(f.sendMessageURL, sendMessage, content_type_application_json)
+	return f.newPostSendType(f.sendMessageURL, sendMessage, content_type_application_json, nil)
 }
 
 func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) (*SendType, error) {
@@ -169,20 +185,28 @@ func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64)
 		Offset:  offset,
 		Limit:   limit,
 		Timeout: timeout}
-	return f.newPostSendType(f.getUpdatesURL, val, content_type_application_json)
+	return f.newPostSendType(f.getUpdatesURL, val, content_type_application_json, nil)
 }
 
 func (f *RequestFactory) String() string {
 	return f.getUpdatesURL + "\n" + f.sendMessageURL + "\n" + f.sendStickerURL
 }
 
-func NewRequestFactory(botToken string) *RequestFactory {
+func NewRequestFactory(botToken string, logger telebot.Logger) *RequestFactory {
 	botRequestUrl := fmt.Sprintf(bot_query_fmt, botToken)
 	var factory RequestFactory
 	factory.sendMessageURL = fmt.Sprintf(cmd_send_message, botRequestUrl)
 	factory.sendStickerURL = fmt.Sprintf(cmd_send_sticker, botRequestUrl)
 	factory.getUpdatesURL = fmt.Sprintf(cmd_get_updates, botRequestUrl)
-	factory.SetWebhookURL = fmt.Sprintf(cmd_set_web_hook, botRequestUrl)
+	factory.setWebhookURL = fmt.Sprintf(cmd_set_web_hook, botRequestUrl)
 	factory.sendPhotoURL = fmt.Sprintf(cmd_send_photo, botRequestUrl)
+
+	factory.defaultCallback = func(result *receive.SendResult) {
+		if result.Ok {
+			return
+		}
+		logger.Errorf("Failed to send response. Received error: code - '%d', description '%s'.", result.ErrorCode, result.Description)
+	}
+
 	return &factory
 }

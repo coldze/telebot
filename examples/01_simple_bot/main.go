@@ -21,7 +21,7 @@ func main() {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
 		return
 	}
-	factory := send.NewRequestFactory(botToken)
+	factory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", factory)
 	logger.Infof("Request factory intialized.")
 	onUpdate := func(update *receive.UpdateType) (*send.SendType, error) {

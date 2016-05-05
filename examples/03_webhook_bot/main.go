@@ -128,7 +128,7 @@ func main() {
 		return
 	}
 
-	requestFactory := send.NewRequestFactory(botToken)
+	requestFactory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
 	onMessage := func(update *receive.UpdateType) (result *send.SendType, err error) {
