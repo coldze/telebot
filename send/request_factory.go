@@ -57,6 +57,19 @@ type RequestFactory struct {
 	setWebhookURL   string
 }
 
+func writeFieldString(writer *multipart.Writer, fieldName string, value string) error {
+	return writeFieldBytes(writer, fieldName, []byte(value))
+}
+
+func writeFieldBytes(writer *multipart.Writer, fieldName string, value []byte) error {
+	fieldWriter, err := writer.CreateFormField(fieldName)
+	if err != nil {
+		return err
+	}
+	_, err = fieldWriter.Write(value)
+	return err
+}
+
 func (f *RequestFactory) NewSendRaw(url string, message interface{}) (*SendType, error) {
 	request, err := json.Marshal(message)
 	if err != nil {
@@ -116,19 +129,6 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendTyp
 	}
 	bufferWriter.Close()
 	return f.newPostSendTypeBytes(f.setWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType(), nil)
-}
-
-func writeFieldString(writer *multipart.Writer, fieldName string, value string) error {
-	return writeFieldBytes(writer, fieldName, []byte(value))
-}
-
-func writeFieldBytes(writer *multipart.Writer, fieldName string, value []byte) error {
-	fieldWriter, err := writer.CreateFormField(fieldName)
-	if err != nil {
-		return err
-	}
-	_, err = fieldWriter.Write(value)
-	return err
 }
 
 func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
