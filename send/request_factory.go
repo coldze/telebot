@@ -80,11 +80,11 @@ func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, conten
 	return &SendType{URL: url, Parameters: message, Type: SEND_TYPE_POST, ContentType: contentType, Callback: callback}, nil
 }
 
-func (f *RequestFactory) NewSendSticker(chatID string, sticker string, notify bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
+func (f *RequestFactory) NewSendSticker(chatID string, sticker string, disableNotification bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
 	stickerMessage := send_requests.SendSticker{
 		ChatID:              chatID,
 		Sticker:             sticker,
-		DisableNotification: notify,
+		DisableNotification: disableNotification,
 		ReplyToMessageID:    replyToMessageID}
 	return f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json, nil)
 }
@@ -110,18 +110,28 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendTyp
 			return nil, err
 		}
 	}
-	fieldWriter, err := bufferWriter.CreateFormField("url")
+	err := writeFieldString(bufferWriter, "url", url)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := fieldWriter.Write([]byte(url)); err != nil {
 		return nil, err
 	}
 	bufferWriter.Close()
 	return f.newPostSendTypeBytes(f.setWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType(), nil)
 }
 
-func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, notify bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
+func writeFieldString(writer *multipart.Writer, fieldName string, value string) error {
+	return writeFieldBytes(writer, fieldName, []byte(value))
+}
+
+func writeFieldBytes(writer *multipart.Writer, fieldName string, value []byte) error {
+	fieldWriter, err := writer.CreateFormField(fieldName)
+	if err != nil {
+		return err
+	}
+	_, err = fieldWriter.Write(value)
+	return err
+}
+
+func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
 	var buf bytes.Buffer
 	bufferWriter := multipart.NewWriter(&buf)
 	if len(photo) <= 0 {
@@ -140,22 +150,45 @@ func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption str
 		return nil, err
 	}
 
-	fieldWriter, err = bufferWriter.CreateFormField("chat_id")
+	err = writeFieldString(bufferWriter, "chat_id", chatID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := fieldWriter.Write([]byte(chatID)); err != nil {
+
+	err = writeFieldString(bufferWriter, "caption", caption)
+	if err != nil {
 		return nil, err
 	}
+
+	replyMarkupSerialized, err := json.Marshal(replyMarkup)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeFieldString(bufferWriter, "disable_notification", fmt.Sprintf("%v", disableNotification))
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeFieldString(bufferWriter, "reply_to_message_id", fmt.Sprintf("%v", replyToMessageID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeFieldBytes(bufferWriter, "reply_markup", replyMarkupSerialized)
+	if err != nil {
+		return nil, err
+	}
+
 	bufferWriter.Close()
 	return f.newPostSendTypeBytes(f.sendPhotoURL, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
 }
 
-func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption string, notify bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
+func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
 	sendPhotoRequest := send_requests.SendPhoto{
 		ChatID:              chatID,
 		Photo:               photo,
-		DisableNotification: notify,
+		DisableNotification: disableNotification,
 		ReplyToMessageID:    replyToMessageID,
 		ReplyMarkup:         replyMarkup}
 	return f.newPostSendType(f.sendPhotoURL, sendPhotoRequest, content_type_application_json, callback)
