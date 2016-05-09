@@ -1,4 +1,4 @@
-# Framework for making Telegram bots (Go)
+# Framework for making Telegram bots (Go) 
 
 ## Two modes are available:
 * Polling mode bot
