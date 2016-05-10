@@ -131,22 +131,22 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) (*SendTyp
 	return f.newPostSendTypeBytes(f.setWebhookURL, buf.Bytes(), bufferWriter.FormDataContentType(), nil)
 }
 
-func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
+func (f *RequestFactory) newFileUpload(url string, chatID string, fileName string, fileFieldName string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
 	var buf bytes.Buffer
 	bufferWriter := multipart.NewWriter(&buf)
-	if len(photo) <= 0 {
-		return nil, errors.New("No photo to upload")
+	if len(fileName) <= 0 {
+		return nil, errors.New("No file to upload")
 	}
-	photoFile, err := os.Open(photo)
+	uploadingFile, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
-	defer photoFile.Close()
-	fieldWriter, err := bufferWriter.CreateFormFile("photo", photo)
+	defer uploadingFile.Close()
+	fieldWriter, err := bufferWriter.CreateFormFile(fileFieldName, fileName)
 	if err != nil {
 		return nil, err
 	}
-	if _, err = io.Copy(fieldWriter, photoFile); err != nil {
+	if _, err = io.Copy(fieldWriter, uploadingFile); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +181,11 @@ func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption str
 	}
 
 	bufferWriter.Close()
-	return f.newPostSendTypeBytes(f.sendPhotoURL, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
+	return f.newPostSendTypeBytes(url, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
+}
+
+func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
+	return f.newFileUpload(f.sendPhotoURL, chatID, photo, "photo", caption, disableNotification, replyToMessageID, replyMarkup, callback)
 }
 
 func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) (*SendType, error) {
