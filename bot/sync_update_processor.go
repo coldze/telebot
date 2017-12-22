@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"errors"
 	"github.com/coldze/telebot"
 	"github.com/coldze/telebot/receive"
 )
@@ -17,7 +16,7 @@ func (u *SyncUpdateProcessor) Process(update *receive.UpdateType) error {
 		return err
 	}
 	if response == nil {
-		return errors.New("Reponse is empty")
+		return nil //errors.New("Reponse is empty")
 	}
 	responseSentResult, err := sendResponse(response)
 	if err != nil {

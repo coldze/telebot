@@ -1,9 +1,9 @@
 package bot
 
 import (
-	"errors"
 	"github.com/coldze/telebot"
 	"github.com/coldze/telebot/send"
+	"log"
 	"runtime/debug"
 	"time"
 )
@@ -20,8 +20,13 @@ func (b *pollingBot) Stop() {
 	b.stopBot <- struct{}{}
 }
 
-func (b *pollingBot) Send(*send.SendType) error {
-	return errors.New("Not implemented.")
+func (b *pollingBot) Send(msg *send.SendType) error {
+	res, err := sendResponse(msg)
+	if err != nil {
+		return err
+	}
+	log.Printf("Response send result: %v", res)
+	return nil
 }
 
 func (b *pollingBot) run() {

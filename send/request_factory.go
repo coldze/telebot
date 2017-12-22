@@ -198,7 +198,7 @@ func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption str
 	return f.newPostSendType(f.sendPhotoURL, sendPhotoRequest, content_type_application_json, callback)
 }
 
-func (f *RequestFactory) NewSendMessage(chatID string, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
+func (f *RequestFactory) NewSendMessage(chatID interface{}, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) (*SendType, error) {
 	var parseModeValue string
 	switch parseMode {
 	case PARSE_MODE_HTML:

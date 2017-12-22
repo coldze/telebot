@@ -45,21 +45,17 @@ type DocumentType struct {
 }
 
 type StickerType struct {
-	ID     string         `json:"file_id"`
-	Width  int64          `json:"width"`
-	Height int64          `json:"height"`
-	Thumb  *PhotoSizeType `json:"thumb,omitempty"`
-	Size   int64          `json:"file_size,omitempty"`
+  PhotoSizeType
+	Emoji   *string        `json:"emoji,omitempty"`
+	SetName *string        `json:"set_name,omitempty"`
+	Thumb   *PhotoSizeType `json:"thumb,omitempty"`
 }
 
 type VideoType struct {
-	ID       string         `json:"file_id"`
-	Width    int64          `json:"width"`
-	Height   int64          `json:"height"`
+  PhotoSizeType
 	Duration int64          `json:"duration"`
 	Thumb    *PhotoSizeType `json:"thumb,omitempty"`
 	MimeType string         `json:"mime_type,omitempty"`
-	Size     int64          `json:"file_size,omitempty"`
 }
 
 type VoiceType struct {
@@ -94,6 +90,10 @@ type UserType struct {
 	LastName  string `json:"last_name,omitempty"`
 	UserName  string `json:"username,omitempty"`
 }
+
+const (
+  CHAT_TYPE_PRIVATE = "private"
+)
 
 type ChatType struct {
 	ID        int64  `json:"id"`
@@ -158,7 +158,7 @@ type InlineQueryType struct {
 }
 
 type CallbackQueryType struct {
-	ID              int64        `json:"id"`
+	ID              string       `json:"id"`
 	From            UserType     `json:"from"`
 	Message         *MessageType `json:"message,omitempty"`
 	InlineMessageID string       `json:"inline_message_id,omitempty"`
@@ -168,6 +168,9 @@ type CallbackQueryType struct {
 type UpdateType struct {
 	ID                 int64                   `json:"update_id"`
 	Message            *MessageType            `json:"message,omitempty"`
+	EditedMessage      *MessageType            `json:"edited_message,omitempty"`
+	ChannelPost        *MessageType            `json:"channel_post,omitempty"`
+	EditedChannelPost  *MessageType            `json:"edited_channel_post,omitempty"`
 	InlineQuery        *InlineQueryType        `json:"inline_query,omitempty"`
 	ChosenInlineResult *ChosenInlineResultType `json:"chosen_inline_result,omitempty"`
 	CallbackQuery      *CallbackQueryType      `json:"callback_query,omitempty"`
