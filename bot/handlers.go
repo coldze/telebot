@@ -12,8 +12,8 @@ type CommandCallType struct {
 	MetaInfo *receive.UpdateType
 }
 
-type CommandHandler func(command *CommandCallType) (*send.SendType, error)
-type MessageHandler func(message *receive.UpdateType) (*send.SendType, error)
+type CommandHandler func(command *CommandCallType) ([]*send.SendType, error)
+type MessageHandler func(message *receive.UpdateType) ([]*send.SendType, error)
 
 type BotHandlers struct {
 	handlers  map[string]CommandHandler
@@ -29,7 +29,7 @@ func (r *BotHandlers) RegisterCommand(commandName string, handler CommandHandler
 	return nil
 }
 
-func (r *BotHandlers) OnCommand(commandName string, args *CommandCallType) (*send.SendType, error) {
+func (r *BotHandlers) OnCommand(commandName string, args *CommandCallType) ([]*send.SendType, error) {
 	handler, ok := r.handlers[commandName]
 	if !ok {
 		return nil, fmt.Errorf("Handler not set for command: %s.", commandName)
@@ -37,7 +37,7 @@ func (r *BotHandlers) OnCommand(commandName string, args *CommandCallType) (*sen
 	return handler(args)
 }
 
-func (r *BotHandlers) OnMessage(message *receive.UpdateType) (*send.SendType, error) {
+func (r *BotHandlers) OnMessage(message *receive.UpdateType) ([]*send.SendType, error) {
 	if r.onMessage == nil {
 		return nil, errors.New("No default handler.")
 	}

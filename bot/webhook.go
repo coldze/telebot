@@ -23,7 +23,7 @@ type webHookBot struct {
 func (b *webHookBot) Stop() {
 }
 
-func (b *webHookBot) Send(*send.SendType) error {
+func (b *webHookBot) Send([]*send.SendType) error {
 	return errors.New("Not implemented.")
 }
 
@@ -72,19 +72,31 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 		return err
 	}
 
-	res, err := sendRequest(signUp)
-	if err != nil {
-		return err
-	}
-	http.HandleFunc("/telebot/ping", pingHandler)
-	b.logger.Infof("Web-hook sign-up result: %s", string(res))
-	//return http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-	return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
+  signUpResult := []byte{}
+  for i := range signUp {
+    res, err := sendRequest(signUp[i])
+    if err != nil {
+      return err
+    }
+    signUpResult = append(signUpResult, res...)
+  }
+
+	http.HandleFunc("/ping", pingHandler)
+	b.logger.Infof("Web-hook sign-up result: %s", string(signUpResult))
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	//return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
 }
 
 func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, logger telebot.Logger) (Bot, error) {
-	updateProcessor := &SyncUpdateProcessor{logger: logger, onUpdate: onUpdate}
-	bot := webHookBot{logger: logger, factory: factory, updateProcessor: updateProcessor}
+	updateProcessor := &SyncUpdateProcessor{
+		logger:   logger,
+		onUpdate: onUpdate,
+	}
+	bot := webHookBot{
+		logger:          logger,
+		factory:         factory,
+		updateProcessor: updateProcessor,
+	}
 	err := bot.singUp(url, listenPort, sslPrivateKey, sslPublicKey, isSelfSigned)
 	if err != nil {
 		return nil, err

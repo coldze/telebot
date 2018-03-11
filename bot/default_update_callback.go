@@ -2,11 +2,13 @@ package bot
 
 import (
 	"errors"
+	"fmt"
 	"github.com/coldze/telebot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"log"
 	"strings"
+  "github.com/coldze/telebot/send/requests"
 )
 
 func parseCommand(message *receive.MessageType, update *receive.UpdateType) (*CommandCallType, string) {
@@ -26,49 +28,73 @@ func parseCommand(message *receive.MessageType, update *receive.UpdateType) (*Co
 	return nil, ""
 }
 
-func getMessage(update *receive.UpdateType) *receive.MessageType {
-	if update.Message != nil {
-		return update.Message
-	}
-	if update.EditedMessage != nil {
-		return update.EditedMessage
-	}
-	if update.ChannelPost != nil {
-		return update.ChannelPost
-	}
-	if update.EditedChannelPost != nil {
-		return update.EditedChannelPost
-	}
-	return nil
+func parseCommandFromCallbackQuery(update *receive.UpdateType) (*CommandCallType, string) {
+	return &CommandCallType{
+		MetaInfo: update,
+	}, update.CallbackQuery.Data
 }
 
-func NewDefaultUpdateCallback(logger telebot.Logger, handlers *BotHandlers) (UpdateCallback, error) {
+func NewDefaultUpdateCallback(factory *send.RequestFactory, logger telebot.Logger, handlers *BotHandlers) (UpdateCallback, error) {
 	if logger == nil {
 		return nil, errors.New("Invalid logger specified.")
 	}
 	if handlers == nil {
 		return nil, errors.New("Invalid handlers specified.")
 	}
-	return func(update *receive.UpdateType) (*send.SendType, error) {
+	wrapResult := func(chatID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
+		if errValue == nil {
+			return resp, errValue
+		}
+		return factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+	}
+  wrapCallbackResult := func(chatID interface{}, callbackID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
+    if errValue == nil {
+      return resp, errValue
+    }
+    resp, err := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+    if err != nil {
+      return nil, err
+    }
+    respCallback, err := factory.NewAnswerCallbackQuery(&requests.AnswerCallbackQuery{
+      CallbackQueryID: callbackID,
+      ShowAlert: true,
+      Text: "Failed to process",
+    })
+    if err != nil {
+      return resp, err
+    }
+    return append(resp, respCallback...), nil
+  }
+	return func(update *receive.UpdateType) ([]*send.SendType, error) {
 		log.Printf("%+v", update)
 		log.Printf("%+v", update.CallbackQuery)
 		if update.CallbackQuery != nil {
 			log.Printf("%+v", update.CallbackQuery.Message)
+			cmd, cmdName := parseCommandFromCallbackQuery(update)
+			resp, err := handlers.OnCommand(cmdName, cmd)
+			return wrapCallbackResult(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.ID, resp, err)
 		}
 		if update == nil {
 			return nil, nil
 		}
-		msg := getMessage(update)
+		msg := GetMessage(update)
 		if msg == nil {
 			return handlers.OnMessage(update)
 		}
+		chatID := int64(-1)
+		if msg.Chat != nil {
+			chatID = msg.Chat.ID
+		}
 		if msg.Entities == nil {
-			return handlers.OnMessage(update)
+			resp, err := handlers.OnMessage(update)
+			return wrapResult(chatID, resp, err)
 		}
 		cmd, cmdName := parseCommand(msg, update)
 		if cmd == nil {
-			return handlers.OnMessage(update)
+			resp, err := handlers.OnMessage(update)
+			return wrapResult(chatID, resp, err)
 		}
-		return handlers.OnCommand(cmdName, cmd)
+		resp, err := handlers.OnCommand(cmdName, cmd)
+		return wrapResult(chatID, resp, err)
 	}, nil
 }

@@ -22,8 +22,11 @@ func (u *SyncUpdateProcessor) Process(update *receive.UpdateType) error {
 	if err != nil {
 		return err
 	}
-	if response.Callback != nil {
-		response.Callback(responseSentResult)
+	for i := range responseSentResult {
+		res := responseSentResult[i]
+		if res.Callback != nil {
+			res.Callback(res.Result, res.Error)
+		}
 	}
 	return nil
 }

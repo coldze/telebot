@@ -5,10 +5,10 @@ import (
 	"github.com/coldze/telebot/send"
 )
 
-type UpdateCallback func(update *receive.UpdateType) (*send.SendType, error)
+type UpdateCallback func(update *receive.UpdateType) ([]*send.SendType, error)
 
 type Bot interface {
-	Send(*send.SendType) error
+	Send([]*send.SendType) error
 	Stop()
 }
 

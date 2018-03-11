@@ -7,7 +7,7 @@ const (
 	SEND_TYPE_GET
 )
 
-type OnSentCallback func(result *receive.SendResult)
+type OnSentCallback func(result *receive.SendResult, err error)
 
 type SendType struct {
 	URL         string
@@ -15,6 +15,12 @@ type SendType struct {
 	Parameters  []byte
 	ContentType string
 	Callback    OnSentCallback
+}
+
+type SendResultWithCallback struct {
+	Result   *receive.SendResult
+	Callback OnSentCallback
+	Error    error
 }
 
 type RequestSender interface {

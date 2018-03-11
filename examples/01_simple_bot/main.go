@@ -7,7 +7,9 @@ import (
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
+	"log"
 	"os"
+	"time"
 )
 
 const (
@@ -25,6 +27,7 @@ func main() {
 	logger.Infof("Available bot functionality:\n%v", factory)
 	logger.Infof("Request factory intialized.")
 	onUpdate := func(update *receive.UpdateType) (*send.SendType, error) {
+		return nil, nil
 		if update == nil {
 			return nil, nil
 		}
@@ -50,6 +53,20 @@ func main() {
 		return request, nil
 	}
 	bot := bot.NewPollingBot(factory, onUpdate, 1000, logger)
+	go func() {
+		time.Sleep(10 * time.Second)
+		log.Print("Sending to channel")
+		msg, err := factory.NewSendMessage("-1001121852273", "TEST MESSAGE", send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+		if err != nil {
+			log.Printf("Failed to create a message: %v", err)
+			return
+		}
+		err = bot.Send(msg)
+		if err != nil {
+			log.Printf("Failed to send the message: %v", err)
+			return
+		}
+	}()
 	defer bot.Stop()
 	logger.Infof("Bot started. Press Enter to stop.")
 	_, _ = fmt.Scanf("\n")

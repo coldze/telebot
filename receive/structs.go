@@ -45,14 +45,14 @@ type DocumentType struct {
 }
 
 type StickerType struct {
-  PhotoSizeType
+	PhotoSizeType
 	Emoji   *string        `json:"emoji,omitempty"`
 	SetName *string        `json:"set_name,omitempty"`
 	Thumb   *PhotoSizeType `json:"thumb,omitempty"`
 }
 
 type VideoType struct {
-  PhotoSizeType
+	PhotoSizeType
 	Duration int64          `json:"duration"`
 	Thumb    *PhotoSizeType `json:"thumb,omitempty"`
 	MimeType string         `json:"mime_type,omitempty"`
@@ -92,7 +92,7 @@ type UserType struct {
 }
 
 const (
-  CHAT_TYPE_PRIVATE = "private"
+	CHAT_TYPE_PRIVATE = "private"
 )
 
 type ChatType struct {
@@ -184,6 +184,6 @@ type UpdateResultType struct {
 type SendResult struct {
 	Ok          bool        `json:"ok"`
 	ErrorCode   int64       `json:"error_code,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Result      MessageType `json:"result,omitempty"`
+	Description *string      `json:"description,omitempty"`
+	Result      *MessageType `json:"result,omitempty"`
 }
