@@ -83,7 +83,7 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 	//return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
 }
 
-func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, logger telebot.Logger) (Bot, error) {
+func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, logger logs.Logger) (Bot, error) {
 	updateProcessor := &SyncUpdateProcessor{
 		logger:   logger,
 		onUpdate: onUpdate,

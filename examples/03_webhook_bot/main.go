@@ -22,6 +22,8 @@ const (
 	BOT_SSL_SELF_SIGNED         = "BOT_SSL_SELF_SIGNED"
 	BOT_UPDATE_CALLBACK_URL_KEY = "BOT_UPDATE_CALLBACK_URL"
 	BOT_HTTPS_LISTEN_PORT_KEY   = "BOT_HTTPS_LISTEN_PORT"
+
+	STICKER_ID = "BQADAgADQAADyIsGAAGMQCvHaYLU_AI"
 )
 
 type UsersMemory struct {
@@ -39,7 +41,7 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("Remember command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -68,7 +70,7 @@ func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, l
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("List command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -94,7 +96,7 @@ func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, l
 }
 
 func NewOnStartCommand(requestFactory *send.RequestFactory, logger logs.Logger) (bot.CommandHandler, error) {
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("Start command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -104,19 +106,6 @@ func NewOnStartCommand(requestFactory *send.RequestFactory, logger logs.Logger) 
 		}
 
 		logger.Infof("From: %+v. Chat: %+v. Argument: %+v", command.MetaInfo.Message.From, command.MetaInfo.Message.Chat, command.Argument)
-
-		/*var message string
-		  if !ok {
-		    message = "I have no history for you, sorry :("
-		  } else {
-		    var buffer bytes.Buffer
-		    for i := range memory {
-		      buffer.WriteString(memory[i])
-		      buffer.WriteString("\n")
-		    }
-		    message = buffer.String()
-		  }
-		  return requestFactory.NewSendMessage(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), message, 0, false, false, 0, nil)*/
 
 		var inlineKeyboardMarkup markup.InlineKeyboardMarkupType
 		inlineKeyboardMarkup.Buttons = make([][]markup.InlineKeyboardButtonType, 1)
@@ -140,9 +129,6 @@ func NewOnStartCommand(requestFactory *send.RequestFactory, logger logs.Logger) 
 		replyKeyboard.Keyboard[0][8].Text = "9"
 
 		return requestFactory.NewSendMessage(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), "Choose:", 0, false, false, 0, replyKeyboard)
-
-		//return requestFactory.NewSendMessage("@cold3e", "TEST directly", 0, false, false, 0, nil)
-		//return nil, nil
 	}, nil
 }
 
@@ -198,13 +184,15 @@ func main() {
 	requestFactory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
-	onMessage := func(update *receive.UpdateType) (result *send.SendType, err error) {
+	onMessage := func(update *receive.UpdateType) (result []*send.SendType, err error) {
 		if update.Message.Sticker != nil {
-			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), "BQADAgADQAADyIsGAAGMQCvHaYLU_AI", false, 0, nil)
+			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
 		} else {
 			result, err = requestFactory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
-		logger.Debugf("Response: %v.", string(result.Parameters))
+		for i := range result {
+			logger.Debugf("Response[%v]: %v.", i, string(result[i].Parameters))
+		}
 		return
 	}
 	registry := bot.NewBotHandlers(onMessage)
@@ -233,7 +221,7 @@ func main() {
 		logger.Errorf("Initialization failed. Error: %v.", err)
 		return
 	}
-	onUpdate, err := bot.NewDefaultUpdateCallback(logger, registry)
+	onUpdate, err := bot.NewDefaultUpdateCallback(requestFactory, logger, registry)
 	if err != nil {
 		logger.Errorf("Failed to create default update-callback. Error: %v.", err)
 		return

@@ -14,10 +14,12 @@ import (
 
 const (
 	BOT_TOKEN_KEY = "BOT_TOKEN"
+	CHAT_ID       = "-1001121852273"
+	STICKER_ID    = "BQADAgADQAADyIsGAAGMQCvHaYLU_AI"
 )
 
 func main() {
-	logger := logs.NewStdoutLogger()
+	logger := logs.NewStdLogger()
 	botToken, ok := os.LookupEnv(BOT_TOKEN_KEY)
 	if !ok {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
@@ -26,7 +28,7 @@ func main() {
 	factory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", factory)
 	logger.Infof("Request factory intialized.")
-	onUpdate := func(update *receive.UpdateType) (*send.SendType, error) {
+	onUpdate := func(update *receive.UpdateType) ([]*send.SendType, error) {
 		return nil, nil
 		if update == nil {
 			return nil, nil
@@ -40,31 +42,33 @@ func main() {
 		} else {
 			logger.Debugf("Received update:\n%v", string(dumpedUpdate))
 		}
-		var request *send.SendType
+		var request []*send.SendType
 		if update.Message.Sticker != nil {
-			request, err = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), "BQADAgADQAADyIsGAAGMQCvHaYLU_AI", false, 0, nil)
+			request, err = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
 		} else {
 			request, err = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
 		if err != nil {
 			return nil, err
 		}
-		logger.Debugf("Response: %v.", string(request.Parameters))
+		for i := range request {
+			logger.Debugf("Response[%v]: %v.", i, string(request[i].Parameters))
+		}
 		return request, nil
 	}
-	bot := bot.NewPollingBot(factory, onUpdate, 1000, logger)
+	botApp := bot.NewPollingBot(factory, onUpdate, 1000, logger)
 	go func() {
 		time.Sleep(10 * time.Second)
-		msg, err := factory.NewSendMessage("-1001121852273", "TEST MESSAGE", send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+		msg, err := factory.NewSendMessage(CHAT_ID, "TEST MESSAGE", send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		if err != nil {
 			return
 		}
-		err = bot.Send(msg)
+		err = botApp.Send(msg)
 		if err != nil {
 			return
 		}
 	}()
-	defer bot.Stop()
+	defer botApp.Stop()
 	logger.Infof("Bot started. Press Enter to stop.")
 	_, _ = fmt.Scanf("\n")
 }

@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/coldze/telebot/receive"
-	"github.com/coldze/telebot/send"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
 )
 
 func GetMessage(update *receive.UpdateType) *receive.MessageType {

@@ -17,6 +17,8 @@ import (
 const (
 	BOT_TOKEN_KEY      = "BOT_TOKEN"
 	BOT_IMAGE_FILE_KEY = "BOT_IMAGE_FILE"
+
+	STICKER_ID = "BQADAgADQAADyIsGAAGMQCvHaYLU_AI"
 )
 
 type UsersMemory struct {
@@ -34,7 +36,7 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("Remember command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -56,14 +58,14 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 	}, nil
 }
 
-func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger telebot.Logger) (bot.CommandHandler, error) {
+func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger logs.Logger) (bot.CommandHandler, error) {
 	if users == nil {
 		return nil, nil
 	}
 	if requestFactory == nil {
 		return nil, nil
 	}
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("List command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -113,7 +115,7 @@ func NewOnTestCommand(users *UsersMemory, requestFactory *send.RequestFactory, i
 		return nil, nil
 	}
 	var imageHolder testImageHolder
-	return func(command *bot.CommandCallType) (*send.SendType, error) {
+	return func(command *bot.CommandCallType) ([]*send.SendType, error) {
 		logger.Infof("Test command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
 			return nil, errors.New("FROM missing")
@@ -128,7 +130,10 @@ func NewOnTestCommand(users *UsersMemory, requestFactory *send.RequestFactory, i
 			return requestFactory.NewResendPhoto(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), imgID, "", false, 0, nil, nil)
 		}
 		logger.Infof("Uploading and sending.")
-		return requestFactory.NewUploadPhoto(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), imageFile, "", false, 0, nil, func(result *receive.SendResult) {
+		return requestFactory.NewUploadPhoto(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), imageFile, "", false, 0, nil, func(result *receive.SendResult, err error) {
+			if err != nil {
+				logger.Errorf("Failed to send response. Error: %v", err)
+			}
 			if !result.Ok {
 				logger.Errorf("Failed to send response. Received error: code - '%d', description '%s'.", result.ErrorCode, result.Description)
 				return
@@ -165,13 +170,15 @@ func main() {
 	requestFactory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", requestFactory)
 	logger.Infof("Request factory intialized.")
-	onMessage := func(update *receive.UpdateType) (result *send.SendType, err error) {
+	onMessage := func(update *receive.UpdateType) (result []*send.SendType, err error) {
 		if update.Message.Sticker != nil {
-			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), "BQADAgADQAADyIsGAAGMQCvHaYLU_AI", false, 0, nil)
+			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
 		} else {
 			result, err = requestFactory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
-		logger.Debugf("Response: %v.", string(result.Parameters))
+		for i := range result {
+			logger.Debugf("Response[%v]: %v.", i, string(result[i].Parameters))
+		}
 		return
 	}
 	registry := bot.NewBotHandlers(onMessage)
@@ -202,14 +209,14 @@ func main() {
 		logger.Errorf("Initialization failed. Error: %v.", err)
 		return
 	}
-	onUpdate, err := bot.NewDefaultUpdateCallback(logger, registry)
+	onUpdate, err := bot.NewDefaultUpdateCallback(requestFactory, logger, registry)
 	if err != nil {
 		logger.Errorf("Failed to create default update-callback. Error: %v.", err)
 		return
 	}
 
-	bot := bot.NewPollingBot(requestFactory, onUpdate, 1000, logger)
-	defer bot.Stop()
+	botApp := bot.NewPollingBot(requestFactory, onUpdate, 1000, logger)
+	defer botApp.Stop()
 	logger.Infof("Bot started. Press Enter to stop.")
 	_, _ = fmt.Scanf("\n")
 }
