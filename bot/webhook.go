@@ -14,27 +14,9 @@ import (
 	"github.com/coldze/telebot/send"
 )
 
-type webHookBot struct {
-	logger          logs.Logger
-	factory         *send.RequestFactory
-	updateProcessor UpdateProcessor
-}
+type handlingFunction func(w http.ResponseWriter, r *http.Request)
 
-func (b *webHookBot) Stop() {
-}
-
-func (b *webHookBot) Send([]*send.SendType) custom_error.CustomError {
-	return custom_error.MakeErrorf("Not implemented.")
-}
-
-func pingHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Body != nil {
-		defer r.Body.Close()
-	}
-	w.Write([]byte(fmt.Sprintf("Ping from '%v'.\nReceived at: %v.", r.RemoteAddr, time.Now().UTC())))
-}
-
-func newHandlingFunc(logger logs.Logger, updateProcessor UpdateProcessor) func(w http.ResponseWriter, r *http.Request) {
+func newHandlingFunc(logger logs.Logger, updateProcessor UpdateProcessor) handlingFunction {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		body, err := ioutil.ReadAll(r.Body)
@@ -55,14 +37,33 @@ func newHandlingFunc(logger logs.Logger, updateProcessor UpdateProcessor) func(w
 	}
 }
 
-func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool) custom_error.CustomError {
-	handlingFunc := newHandlingFunc(b.logger, b.updateProcessor)
+type webHookBot struct {
+	logger          logs.Logger
+	factory         *send.RequestFactory
+	updateProcessor UpdateProcessor
+}
+
+func (b *webHookBot) Stop() {
+}
+
+func (b *webHookBot) Send([]*send.SendType) custom_error.CustomError {
+	return custom_error.MakeErrorf("Not implemented.")
+}
+
+func pingHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
+	w.Write([]byte(fmt.Sprintf("Ping from '%v'.\nReceived at: %v.", r.RemoteAddr, time.Now().UTC())))
+}
+
+func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, handlingFunction handlingFunction) custom_error.CustomError {
 	u, err := url.Parse(listenUrl)
 	if err != nil {
 		return custom_error.MakeErrorf("Failed to parse url '%v'. Error: %v", listenUrl, err)
 	}
 
-	http.HandleFunc(u.Path, handlingFunc)
+	http.HandleFunc(u.Path, handlingFunction)
 	sslSubscribeKey := ""
 	if isSelfSigned {
 		sslSubscribeKey = sslPublicKey
@@ -91,17 +92,13 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 	//return http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslPublicKey, sslPrivateKey, nil)
 }
 
-func NewWebHookBot(factory *send.RequestFactory, onUpdate UpdateCallback, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, logger logs.Logger) (Bot, custom_error.CustomError) {
-	updateProcessor := &SyncUpdateProcessor{
-		logger:   logger,
-		onUpdate: onUpdate,
-	}
+func NewWebHookBot(factory *send.RequestFactory, updateProcessor UpdateProcessor, url string, listenPort int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool, logger logs.Logger) (Bot, custom_error.CustomError) {
 	bot := webHookBot{
-		logger:          logger,
-		factory:         factory,
-		updateProcessor: updateProcessor,
+		logger:  logger,
+		factory: factory,
 	}
-	err := bot.singUp(url, listenPort, sslPrivateKey, sslPublicKey, isSelfSigned)
+	handlingFunction := newHandlingFunc(logger, updateProcessor)
+	err := bot.singUp(url, listenPort, sslPrivateKey, sslPublicKey, isSelfSigned, handlingFunction)
 	if err != nil {
 		return nil, custom_error.NewErrorf(err, "Failed to sign-up for changes")
 	}

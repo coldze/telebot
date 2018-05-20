@@ -291,7 +291,8 @@ func main() {
 		return
 	}
 
-	_, err = bot.NewWebHookBot(requestFactory, onUpdate, updateCallbackURL, listenPort, sslPrivate, sslPublic, isSelfSigned, logger)
+	updateProcessor := bot.NewUpdateProcessor(onUpdate, logger)
+	_, err = bot.NewWebHookBot(requestFactory, updateProcessor, updateCallbackURL, listenPort, sslPrivate, sslPublic, isSelfSigned, logger)
 	if err != nil {
 		logger.Errorf("Failed to start bot. Error: %v.", err)
 		return

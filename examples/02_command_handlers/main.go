@@ -12,6 +12,7 @@ import (
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"github.com/coldze/telebot/send/requests"
+	"time"
 )
 
 const (
@@ -186,7 +187,8 @@ func main() {
 		return
 	}
 
-	botApp := bot.NewPollingBot(requestFactory, onUpdate, 1000, logger)
+	updateProcessor := bot.NewUpdateProcessor(onUpdate, logger)
+	botApp := bot.NewPollingBot(requestFactory, updateProcessor, time.Second, logger)
 	defer botApp.Stop()
 	logger.Infof("Bot started. Press Enter to stop.")
 	_, _ = fmt.Scanf("\n")

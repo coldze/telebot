@@ -76,7 +76,8 @@ func main() {
 		}
 		return request, nil
 	}
-	botApp := bot.NewPollingBot(factory, onUpdate, 1000, logger)
+	updateProcessor := bot.NewUpdateProcessor(onUpdate, logger)
+	botApp := bot.NewPollingBot(factory, updateProcessor, time.Second, logger)
 	go func() {
 		time.Sleep(10 * time.Second)
 		sendMessage := &requests.SendMessage{
