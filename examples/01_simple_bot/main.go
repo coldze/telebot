@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/coldze/telebot"
+	"os"
+	"time"
+
+	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
-	"log"
-	"os"
-	"time"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 )
 
 func main() {
-	logger := telebot.NewStdoutLogger()
+	logger := logs.NewStdoutLogger()
 	botToken, ok := os.LookupEnv(BOT_TOKEN_KEY)
 	if !ok {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)
@@ -55,15 +55,12 @@ func main() {
 	bot := bot.NewPollingBot(factory, onUpdate, 1000, logger)
 	go func() {
 		time.Sleep(10 * time.Second)
-		log.Print("Sending to channel")
 		msg, err := factory.NewSendMessage("-1001121852273", "TEST MESSAGE", send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		if err != nil {
-			log.Printf("Failed to create a message: %v", err)
 			return
 		}
 		err = bot.Send(msg)
 		if err != nil {
-			log.Printf("Failed to send the message: %v", err)
 			return
 		}
 	}()

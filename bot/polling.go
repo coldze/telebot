@@ -1,17 +1,17 @@
 package bot
 
 import (
-	"github.com/coldze/telebot"
-	"github.com/coldze/telebot/send"
-	"log"
 	"runtime/debug"
 	"time"
-  "github.com/coldze/telebot/receive"
+
+	"github.com/coldze/primitives/logs"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
 )
 
 type pollingBot struct {
 	stopBot         chan struct{}
-	logger          telebot.Logger
+	logger          logs.Logger
 	factory         *send.RequestFactory
 	period          time.Duration
 	updateProcessor UpdateProcessor
@@ -22,23 +22,22 @@ func (b *pollingBot) Stop() {
 }
 
 func (b *pollingBot) Send(msg []*send.SendType) error {
-	res, err := sendResponse(msg)
+	_, err := sendResponse(msg)
 	if err != nil {
 		return err
 	}
-	log.Printf("Response send result: %v", res)
 	return nil
 }
 
 func (b *pollingBot) sendRequests(messages []*send.SendType) error {
-  var err error
-  for i := range messages {
-    _, err = sendRequest(messages[i])
-    if err != nil {
-      return err
-    }
-  }
-  return nil
+	var err error
+	for i := range messages {
+		_, err = sendRequest(messages[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (b *pollingBot) run() {
@@ -66,27 +65,27 @@ func (b *pollingBot) run() {
 	}()
 }
 
-func (b *pollingBot) processUpdates(updates *receive.UpdateResultType, lastUpdateID int64) (int64) {
-  if !updates.Ok {
-    b.logger.Errorf("Bad updates object...")
-    return lastUpdateID
-  }
-  if len(updates.Updates) <= 0 {
-    return lastUpdateID
-  }
-  lastUpdateIDValue := lastUpdateID
-  for updateIndex := range updates.Updates {
-    lastUpdate := updates.Updates[updateIndex]
-    index := lastUpdate.ID
-    if index > lastUpdateIDValue {
-      lastUpdateIDValue = index
-    }
-    err := b.updateProcessor.Process(&lastUpdate)
-    if err != nil {
-      b.logger.Errorf("Error has happened, while processing update id '%d'. Error: %v.", lastUpdate.ID, err)
-    }
-  }
-  return lastUpdateIDValue
+func (b *pollingBot) processUpdates(updates *receive.UpdateResultType, lastUpdateID int64) int64 {
+	if !updates.Ok {
+		b.logger.Errorf("Bad updates object...")
+		return lastUpdateID
+	}
+	if len(updates.Updates) <= 0 {
+		return lastUpdateID
+	}
+	lastUpdateIDValue := lastUpdateID
+	for updateIndex := range updates.Updates {
+		lastUpdate := updates.Updates[updateIndex]
+		index := lastUpdate.ID
+		if index > lastUpdateIDValue {
+			lastUpdateIDValue = index
+		}
+		err := b.updateProcessor.Process(&lastUpdate)
+		if err != nil {
+			b.logger.Errorf("Error has happened, while processing update id '%d'. Error: %v.", lastUpdate.ID, err)
+		}
+	}
+	return lastUpdateIDValue
 }
 
 func (b *pollingBot) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
@@ -108,19 +107,19 @@ func (b *pollingBot) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
 		b.logger.Errorf("Failed to prepare update request. Error: %v.", err)
 		return
 	}
-  for i := range getUpdatesRequest {
-    updates, err := poll(getUpdatesRequest[i])
-    if err != nil {
-      b.logger.Errorf("Failed to pull updates. Error: %v.", err)
-      return
-    }
-    lastUpdateID = b.processUpdates(updates, lastUpdateID)
-  }
+	for i := range getUpdatesRequest {
+		updates, err := poll(getUpdatesRequest[i])
+		if err != nil {
+			b.logger.Errorf("Failed to pull updates. Error: %v.", err)
+			return
+		}
+		lastUpdateID = b.processUpdates(updates, lastUpdateID)
+	}
 
 	return
 }
 
-func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPeriodMs int64, logger telebot.Logger) Bot {
+func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPeriodMs int64, logger logs.Logger) Bot {
 	stopUpdatesChan := make(chan struct{})
 	updateProcessor := &SyncUpdateProcessor{logger: logger, onUpdate: onUpdate}
 	bot := pollingBot{stopBot: stopUpdatesChan, logger: logger, factory: factory, updateProcessor: updateProcessor, period: time.Duration(pollPeriodMs) * time.Millisecond}

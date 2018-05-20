@@ -1,12 +1,12 @@
 package bot
 
 import (
-	"github.com/coldze/telebot"
+	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/receive"
 )
 
 type SyncUpdateProcessor struct {
-	logger   telebot.Logger
+	logger   logs.Logger
 	onUpdate UpdateCallback
 }
 

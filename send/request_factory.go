@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/coldze/telebot"
-	"github.com/coldze/telebot/receive"
-	"github.com/coldze/telebot/send/internal/requests"
-  "github.com/coldze/telebot/send/requests"
 	"io"
 	"mime/multipart"
 	"os"
+
+	"github.com/coldze/primitives/logs"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send/internal/requests"
+	"github.com/coldze/telebot/send/requests"
 )
 
 const (
@@ -256,7 +257,7 @@ func (f *RequestFactory) String() string {
 	return f.getUpdatesURL + "\n" + f.sendMessageURL + "\n" + f.sendStickerURL
 }
 
-func NewRequestFactory(botToken string, logger telebot.Logger) *RequestFactory {
+func NewRequestFactory(botToken string, logger logs.Logger) *RequestFactory {
 	botRequestUrl := fmt.Sprintf(bot_query_fmt, botToken)
 	var factory RequestFactory
 	factory.sendMessageURL = fmt.Sprintf(cmd_send_message, botRequestUrl)

@@ -3,12 +3,12 @@ package bot
 import (
 	"errors"
 	"fmt"
-	"github.com/coldze/telebot"
+	"strings"
+
+	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
-	"log"
-	"strings"
-  "github.com/coldze/telebot/send/requests"
+	"github.com/coldze/telebot/send/requests"
 )
 
 func parseCommand(message *receive.MessageType, update *receive.UpdateType) (*CommandCallType, string) {
@@ -34,7 +34,7 @@ func parseCommandFromCallbackQuery(update *receive.UpdateType) (*CommandCallType
 	}, update.CallbackQuery.Data
 }
 
-func NewDefaultUpdateCallback(factory *send.RequestFactory, logger telebot.Logger, handlers *BotHandlers) (UpdateCallback, error) {
+func NewDefaultUpdateCallback(factory *send.RequestFactory, logger logs.Logger, handlers *BotHandlers) (UpdateCallback, error) {
 	if logger == nil {
 		return nil, errors.New("Invalid logger specified.")
 	}
@@ -47,29 +47,26 @@ func NewDefaultUpdateCallback(factory *send.RequestFactory, logger telebot.Logge
 		}
 		return factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
 	}
-  wrapCallbackResult := func(chatID interface{}, callbackID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
-    if errValue == nil {
-      return resp, errValue
-    }
-    resp, err := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
-    if err != nil {
-      return nil, err
-    }
-    respCallback, err := factory.NewAnswerCallbackQuery(&requests.AnswerCallbackQuery{
-      CallbackQueryID: callbackID,
-      ShowAlert: true,
-      Text: "Failed to process",
-    })
-    if err != nil {
-      return resp, err
-    }
-    return append(resp, respCallback...), nil
-  }
+	wrapCallbackResult := func(chatID interface{}, callbackID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
+		if errValue == nil {
+			return resp, errValue
+		}
+		resp, err := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		respCallback, err := factory.NewAnswerCallbackQuery(&requests.AnswerCallbackQuery{
+			CallbackQueryID: callbackID,
+			ShowAlert:       true,
+			Text:            "Failed to process",
+		})
+		if err != nil {
+			return resp, err
+		}
+		return append(resp, respCallback...), nil
+	}
 	return func(update *receive.UpdateType) ([]*send.SendType, error) {
-		log.Printf("%+v", update)
-		log.Printf("%+v", update.CallbackQuery)
 		if update.CallbackQuery != nil {
-			log.Printf("%+v", update.CallbackQuery.Message)
 			cmd, cmdName := parseCommandFromCallbackQuery(update)
 			resp, err := handlers.OnCommand(cmdName, cmd)
 			return wrapCallbackResult(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.ID, resp, err)

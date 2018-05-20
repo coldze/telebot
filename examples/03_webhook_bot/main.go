@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/coldze/telebot"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 	"github.com/coldze/telebot/send/markup"
-	"os"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -31,7 +32,7 @@ func NewUsersMemory() *UsersMemory {
 	return &UsersMemory{Memorized: make(map[int64][]string)}
 }
 
-func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger telebot.Logger) (bot.CommandHandler, error) {
+func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger logs.Logger) (bot.CommandHandler, error) {
 	if users == nil {
 		return nil, nil
 	}
@@ -60,7 +61,7 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 	}, nil
 }
 
-func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger telebot.Logger) (bot.CommandHandler, error) {
+func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, logger logs.Logger) (bot.CommandHandler, error) {
 	if users == nil {
 		return nil, nil
 	}
@@ -92,7 +93,7 @@ func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, l
 	}, nil
 }
 
-func NewOnStartCommand(requestFactory *send.RequestFactory, logger telebot.Logger) (bot.CommandHandler, error) {
+func NewOnStartCommand(requestFactory *send.RequestFactory, logger logs.Logger) (bot.CommandHandler, error) {
 	return func(command *bot.CommandCallType) (*send.SendType, error) {
 		logger.Infof("Start command handler invoked.")
 		if command.MetaInfo.Message.From == nil {
@@ -146,7 +147,7 @@ func NewOnStartCommand(requestFactory *send.RequestFactory, logger telebot.Logge
 }
 
 func main() {
-	logger := telebot.NewStdoutLogger()
+	logger := logs.NewStdLogger()
 	botToken, ok := os.LookupEnv(BOT_TOKEN_KEY)
 	if !ok {
 		logger.Errorf("Failed to get bot-token. Expected to have environment variable '%s'.", BOT_TOKEN_KEY)

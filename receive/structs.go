@@ -182,8 +182,8 @@ type UpdateResultType struct {
 }
 
 type SendResult struct {
-	Ok          bool        `json:"ok"`
-	ErrorCode   int64       `json:"error_code,omitempty"`
+	Ok          bool         `json:"ok"`
+	ErrorCode   int64        `json:"error_code,omitempty"`
 	Description *string      `json:"description,omitempty"`
 	Result      *MessageType `json:"result,omitempty"`
 }

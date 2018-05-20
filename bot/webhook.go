@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/coldze/telebot"
-	"github.com/coldze/telebot/receive"
-	"github.com/coldze/telebot/send"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/coldze/primitives/logs"
+	"github.com/coldze/telebot/receive"
+	"github.com/coldze/telebot/send"
 )
 
 type webHookBot struct {
-	logger          telebot.Logger
+	logger          logs.Logger
 	factory         *send.RequestFactory
 	updateProcessor UpdateProcessor
 }
@@ -31,20 +31,17 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Body != nil {
 		defer r.Body.Close()
 	}
-	log.Printf("%+v", r.Header)
 	w.Write([]byte(fmt.Sprintf("Ping from '%v'.\nReceived at: %v.", r.RemoteAddr, time.Now().UTC())))
 }
 
 func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, sslPublicKey string, isSelfSigned bool) error {
 	testFunc := func(w http.ResponseWriter, r *http.Request) {
-		log.Print("In callback")
 		defer r.Body.Close()
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			b.logger.Errorf("Failed to read update object")
 			return
 		}
-		log.Printf("Body: %+v", string(body))
 		var update receive.UpdateType
 		err = json.Unmarshal(body, &update)
 		if err != nil {
@@ -62,7 +59,6 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 	}
 
 	http.HandleFunc(u.Path, testFunc)
-	log.Printf("Callback path is: %v", u.Path)
 	sslSubscribeKey := ""
 	if isSelfSigned {
 		sslSubscribeKey = sslPublicKey
@@ -72,14 +68,14 @@ func (b *webHookBot) singUp(listenUrl string, port int64, sslPrivateKey string, 
 		return err
 	}
 
-  signUpResult := []byte{}
-  for i := range signUp {
-    res, err := sendRequest(signUp[i])
-    if err != nil {
-      return err
-    }
-    signUpResult = append(signUpResult, res...)
-  }
+	signUpResult := []byte{}
+	for i := range signUp {
+		res, err := sendRequest(signUp[i])
+		if err != nil {
+			return err
+		}
+		signUpResult = append(signUpResult, res...)
+	}
 
 	http.HandleFunc("/ping", pingHandler)
 	b.logger.Infof("Web-hook sign-up result: %s", string(signUpResult))

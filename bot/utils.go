@@ -12,24 +12,24 @@ import (
 )
 
 func GetMessage(update *receive.UpdateType) *receive.MessageType {
-  if update.Message != nil {
-    return update.Message
-  }
-  if update.EditedMessage != nil {
-    return update.EditedMessage
-  }
-  if update.ChannelPost != nil {
-    return update.ChannelPost
-  }
-  if update.EditedChannelPost != nil {
-    return update.EditedChannelPost
-  }
-  if update.CallbackQuery != nil {
-    if update.CallbackQuery.Message != nil {
-      return update.CallbackQuery.Message
-    }
-  }
-  return nil
+	if update.Message != nil {
+		return update.Message
+	}
+	if update.EditedMessage != nil {
+		return update.EditedMessage
+	}
+	if update.ChannelPost != nil {
+		return update.ChannelPost
+	}
+	if update.EditedChannelPost != nil {
+		return update.EditedChannelPost
+	}
+	if update.CallbackQuery != nil {
+		if update.CallbackQuery.Message != nil {
+			return update.CallbackQuery.Message
+		}
+	}
+	return nil
 }
 
 func sendRequest(message *send.SendType) ([]byte, error) {
@@ -73,35 +73,35 @@ func poll(message *send.SendType) (*receive.UpdateResultType, error) {
 }
 
 type hackSendResult struct {
-  Ok          bool        `json:"ok"`
-  ErrorCode   int64       `json:"error_code,omitempty"`
-  Description *string      `json:"description,omitempty"`
-  Result      interface{} `json:"result,omitempty"`
+	Ok          bool        `json:"ok"`
+	ErrorCode   int64       `json:"error_code,omitempty"`
+	Description *string     `json:"description,omitempty"`
+	Result      interface{} `json:"result,omitempty"`
 }
 
 func convertHackSendToSendResult(res *hackSendResult) (*receive.SendResult, error) {
-  var ok bool
-  _, ok = res.Result.(bool)
-  if ok {
-    return &receive.SendResult{
-      Ok: true,
-    }, nil
-  }
-  data, err := json.Marshal(res.Result)
-  if err != nil {
-    return nil, err
-  }
-  msg := receive.MessageType{}
-  err = json.Unmarshal(data, &msg)
-  if err != nil {
-    return nil, err
-  }
-  return &receive.SendResult{
-    Ok: res.Ok,
-    ErrorCode: res.ErrorCode,
-    Description: res.Description,
-    Result: &msg,
-  }, nil
+	var ok bool
+	_, ok = res.Result.(bool)
+	if ok {
+		return &receive.SendResult{
+			Ok: true,
+		}, nil
+	}
+	data, err := json.Marshal(res.Result)
+	if err != nil {
+		return nil, err
+	}
+	msg := receive.MessageType{}
+	err = json.Unmarshal(data, &msg)
+	if err != nil {
+		return nil, err
+	}
+	return &receive.SendResult{
+		Ok:          res.Ok,
+		ErrorCode:   res.ErrorCode,
+		Description: res.Description,
+		Result:      &msg,
+	}, nil
 }
 
 func sendSingleResponse(message *send.SendType) (*receive.SendResult, error) {
@@ -109,7 +109,7 @@ func sendSingleResponse(message *send.SendType) (*receive.SendResult, error) {
 	if err != nil {
 		return nil, err
 	}
-  var hackSend hackSendResult
+	var hackSend hackSendResult
 	err = json.Unmarshal(response, &hackSend)
 	if err != nil {
 		/*if message.Type == send.SEND_TYPE_GET {
