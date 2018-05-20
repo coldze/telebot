@@ -11,6 +11,7 @@ import (
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
+	"github.com/coldze/telebot/send/requests"
 )
 
 const (
@@ -46,9 +47,22 @@ func main() {
 		var request []*send.SendType
 		var customErr custom_error.CustomError
 		if update.Message.Sticker != nil {
-			request, customErr = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
+			sendSticker := &requests.SendSticker{
+				Base: requests.Base{
+					ChatID: update.Message.Chat.ID,
+				},
+				Sticker: STICKER_ID,
+			}
+			request, customErr = factory.NewSendSticker(sendSticker, nil)
 		} else {
-			request, customErr = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+			sendMessage := &requests.SendMessage{
+				Base: requests.Base{
+					ChatID: update.Message.Chat.ID,
+				},
+				Text:      "*ECHO:*\n" + update.Message.Text,
+				ParseMode: send.PARSE_MODE_MARKDOWN,
+			}
+			request, customErr = factory.NewSendMessage(sendMessage, nil)
 		}
 		if customErr != nil {
 			return nil, custom_error.NewErrorf(customErr, "Failed to process update.")
@@ -62,10 +76,18 @@ func main() {
 		}
 		return request, nil
 	}
-	botApp := bot.NewPollingBot(factory, onUpdate, 1000, logger)
+	updateProcessor := bot.NewUpdateProcessor(onUpdate, logger)
+	botApp := bot.NewPollingBot(factory, updateProcessor, time.Second, logger)
 	go func() {
 		time.Sleep(10 * time.Second)
-		msg, err := factory.NewSendMessage(CHAT_ID, "TEST MESSAGE", send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+		sendMessage := &requests.SendMessage{
+			Base: requests.Base{
+				ChatID: CHAT_ID,
+			},
+			Text:      "TEST MESSAGE",
+			ParseMode: send.PARSE_MODE_MARKDOWN,
+		}
+		msg, err := factory.NewSendMessage(sendMessage, nil)
 		if err != nil {
 			return
 		}

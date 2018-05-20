@@ -34,3 +34,10 @@ func (u *SyncUpdateProcessor) Process(update *receive.UpdateType) custom_error.C
 	}
 	return nil
 }
+
+func NewUpdateProcessor(onUpdate UpdateCallback, logger logs.Logger) UpdateProcessor {
+	return &SyncUpdateProcessor{
+		logger:   logger,
+		onUpdate: onUpdate,
+	}
+}

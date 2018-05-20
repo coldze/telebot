@@ -35,7 +35,13 @@ func parseCommandFromCallbackQuery(update *receive.UpdateType) (*CommandCallType
 }
 
 func wrapResult(factory *send.RequestFactory, chatID interface{}, errValue custom_error.CustomError) ([]*send.SendType, custom_error.CustomError) {
-	res, customErr := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+	r := &requests.SendMessage{
+		Base: requests.Base{
+			ChatID: chatID,
+		},
+		Text: fmt.Sprintf("Internal error: %v", errValue),
+	}
+	res, customErr := factory.NewSendMessage(r, nil)
 	if customErr == nil {
 		return res, nil
 	}
@@ -43,7 +49,13 @@ func wrapResult(factory *send.RequestFactory, chatID interface{}, errValue custo
 }
 
 func wrapCallbackResult(factory *send.RequestFactory, chatID interface{}, callbackID interface{}, errValue custom_error.CustomError) ([]*send.SendType, custom_error.CustomError) {
-	resp, customErr := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+	r := &requests.SendMessage{
+		Base: requests.Base{
+			ChatID: chatID,
+		},
+		Text: fmt.Sprintf("Internal error: %v", errValue),
+	}
+	resp, customErr := factory.NewSendMessage(r, nil)
 	if customErr != nil {
 		return nil, custom_error.NewErrorf(customErr, "Failed to send error notification. Original error: %v", errValue)
 	}

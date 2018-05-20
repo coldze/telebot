@@ -16,14 +16,11 @@ import (
 )
 
 const (
-	PARSE_MODE_HTML = iota + 1
-	PARSE_MODE_MARKDOWN
+	PARSE_MODE_HTML     = "HTML"
+	PARSE_MODE_MARKDOWN = "Markdown"
 )
 
 const (
-	parse_mode_html     = "HTML"
-	parse_mode_markdown = "Markdown"
-
 	bot_query_fmt = "https://api.telegram.org/bot%s/"
 
 	cmd_get_updates             = "%sgetUpdates"
@@ -106,16 +103,9 @@ func (f *RequestFactory) newPostSendType(url string, message interface{}, conten
 }
 
 func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, contentType string, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
-	if callback == nil {
-		return []*SendType{
-			&SendType{
-				URL:         url,
-				Parameters:  message,
-				Type:        SEND_TYPE_POST,
-				ContentType: contentType,
-				Callback:    f.defaultCallback,
-			},
-		}, nil
+	cb := callback
+	if cb == nil {
+		cb = f.defaultCallback
 	}
 	return []*SendType{
 		&SendType{
@@ -123,18 +113,93 @@ func (f *RequestFactory) newPostSendTypeBytes(url string, message []byte, conten
 			Parameters:  message,
 			Type:        SEND_TYPE_POST,
 			ContentType: contentType,
-			Callback:    callback,
+			Callback:    cb,
 		},
 	}, nil
 }
 
-func (f *RequestFactory) NewSendSticker(chatID string, sticker string, disableNotification bool, replyToMessageID int64, markup interface{}) ([]*SendType, custom_error.CustomError) {
-	stickerMessage := send_requests.SendSticker{
-		ChatID:              chatID,
-		Sticker:             sticker,
-		DisableNotification: disableNotification,
-		ReplyToMessageID:    replyToMessageID}
-	res, customErr := f.newPostSendType(f.sendStickerURL, stickerMessage, content_type_application_json, nil)
+func getChatIDString(chatID interface{}) (string, custom_error.CustomError) {
+	if chatID == nil {
+		return "", custom_error.MakeErrorf("Failed to convert chat-ID. Empty chat-id specified.")
+	}
+	v, ok := chatID.(string)
+	if ok {
+		return v, nil
+	}
+	vInt, ok := chatID.(int64)
+	if ok {
+		return fmt.Sprintf("%d", vInt), nil
+	}
+	return "", custom_error.MakeErrorf("Failed to convert chat-ID. Unknown type: %T", chatID)
+}
+
+func (f *RequestFactory) newFileUpload(url string, r *requests.SendFile, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
+	chatID, customErr := getChatIDString(r.ChatID)
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to upload file.")
+	}
+	var buf bytes.Buffer
+	bufferWriter := multipart.NewWriter(&buf)
+	if len(r.FileName) <= 0 {
+		return nil, custom_error.MakeErrorf("No file to upload")
+	}
+	uploadingFile, err := os.Open(r.FileName)
+	if err != nil {
+		return nil, custom_error.MakeErrorf("Failed to open file. Fieldname: '%v'. Filename: '%v'. Error: %v", r.FieldName, r.FileName, err)
+	}
+	defer uploadingFile.Close()
+	fieldWriter, err := bufferWriter.CreateFormFile(r.FieldName, r.FileName)
+	if err != nil {
+		return nil, custom_error.MakeErrorf("Failed to create form from file. Fieldname: '%v'. Filename: '%v'. Error: %v", r.FieldName, r.FileName, err)
+	}
+	if _, err = io.Copy(fieldWriter, uploadingFile); err != nil {
+		return nil, custom_error.MakeErrorf("Failed to create form from file. Fieldname: '%v'. Filename: '%v'. Error: %v", r.FieldName, r.FileName, err)
+	}
+	getChatIDString(r.ChatID)
+
+	customErr = writeFieldString(bufferWriter, "chat_id", chatID)
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to write chat_id.")
+	}
+
+	customErr = writeFieldString(bufferWriter, "caption", r.Caption)
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to write caption.")
+	}
+
+	replyMarkupSerialized, err := json.Marshal(r.ReplyMarkup)
+	if err != nil {
+		return nil, custom_error.MakeErrorf("Failed to marshal marked up reply. Error: %v", err)
+	}
+
+	customErr = writeFieldString(bufferWriter, "disable_notification", fmt.Sprintf("%v", r.DisableNotifications))
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to write disable_notification.")
+	}
+
+	customErr = writeFieldString(bufferWriter, "reply_to_message_id", fmt.Sprintf("%v", r.ReplyToMessageID))
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to write reply_to_message_id.")
+	}
+
+	customErr = writeFieldBytes(bufferWriter, "reply_markup", replyMarkupSerialized)
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to write reply_markup.")
+	}
+
+	bufferWriter.Close()
+	res, customErr := f.newPostSendTypeBytes(url, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
+	if customErr == nil {
+		return res, nil
+	}
+	return nil, custom_error.NewErrorf(customErr, "Failed to post-send bytes.")
+}
+
+func (f *RequestFactory) NewSendSticker(r *requests.SendSticker, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
+	if r == nil {
+		return nil, custom_error.MakeErrorf("Failed to send sticker. Request is nil.")
+	}
+	res, customErr := f.newPostSendType(f.sendStickerURL, r, content_type_application_json, callback)
 	if customErr == nil {
 		return res, nil
 	}
@@ -178,106 +243,41 @@ func (f *RequestFactory) NewSubscribe(url string, sslPublicKey string) ([]*SendT
 	return nil, custom_error.NewErrorf(customErr, "Failed to subscribe.")
 }
 
-func (f *RequestFactory) newFileUpload(url string, chatID string, fileName string, fileFieldName string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
-	var buf bytes.Buffer
-	bufferWriter := multipart.NewWriter(&buf)
-	if len(fileName) <= 0 {
-		return nil, custom_error.MakeErrorf("No file to upload")
+func (f *RequestFactory) NewUploadPhoto(r *requests.SendFileBase, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
+	if r == nil {
+		return nil, custom_error.MakeErrorf("Failed to create upload photo. Request is nil.")
 	}
-	uploadingFile, err := os.Open(fileName)
-	if err != nil {
-		return nil, custom_error.MakeErrorf("Failed to open file. Fieldname: '%v'. Filename: '%v'. Error: %v", fileFieldName, fileName, err)
+	photoRequest := requests.SendFile{
+		FieldName:    "photo",
+		SendFileBase: *r,
 	}
-	defer uploadingFile.Close()
-	fieldWriter, err := bufferWriter.CreateFormFile(fileFieldName, fileName)
-	if err != nil {
-		return nil, custom_error.MakeErrorf("Failed to create form from file. Fieldname: '%v'. Filename: '%v'. Error: %v", fileFieldName, fileName, err)
-	}
-	if _, err = io.Copy(fieldWriter, uploadingFile); err != nil {
-		return nil, custom_error.MakeErrorf("Failed to create form from file. Fieldname: '%v'. Filename: '%v'. Error: %v", fileFieldName, fileName, err)
-	}
-
-	customErr := writeFieldString(bufferWriter, "chat_id", chatID)
-	if customErr != nil {
-		return nil, custom_error.NewErrorf(customErr, "Failed to write chat_id.")
-	}
-
-	customErr = writeFieldString(bufferWriter, "caption", caption)
-	if customErr != nil {
-		return nil, custom_error.NewErrorf(customErr, "Failed to write caption.")
-	}
-
-	replyMarkupSerialized, err := json.Marshal(replyMarkup)
-	if err != nil {
-		return nil, custom_error.MakeErrorf("Failed to marshal marked up reply. Error: %v", err)
-	}
-
-	customErr = writeFieldString(bufferWriter, "disable_notification", fmt.Sprintf("%v", disableNotification))
-	if customErr != nil {
-		return nil, custom_error.NewErrorf(customErr, "Failed to write disable_notification.")
-	}
-
-	customErr = writeFieldString(bufferWriter, "reply_to_message_id", fmt.Sprintf("%v", replyToMessageID))
-	if customErr != nil {
-		return nil, custom_error.NewErrorf(customErr, "Failed to write reply_to_message_id.")
-	}
-
-	customErr = writeFieldBytes(bufferWriter, "reply_markup", replyMarkupSerialized)
-	if customErr != nil {
-		return nil, custom_error.NewErrorf(customErr, "Failed to write reply_markup.")
-	}
-
-	bufferWriter.Close()
-	res, customErr := f.newPostSendTypeBytes(url, buf.Bytes(), bufferWriter.FormDataContentType(), callback)
+	res, customErr := f.newFileUpload(f.sendPhotoURL, &photoRequest, callback)
 	if customErr == nil {
 		return res, nil
 	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to post-send bytes.")
+	return nil, custom_error.NewErrorf(customErr, "Failed to create upload photo.")
 }
 
-func (f *RequestFactory) NewUploadPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
-	res, customErr := f.newFileUpload(f.sendPhotoURL, chatID, photo, "photo", caption, disableNotification, replyToMessageID, replyMarkup, callback)
+func (f *RequestFactory) NewSendUploadedPhoto(r *requests.SendUploadedPhoto, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
+	if r == nil {
+		return nil, custom_error.MakeErrorf("Failed to create send uploaded photo. Request is nil.")
+	}
+	res, customErr := f.newPostSendType(f.sendPhotoURL, r, content_type_application_json, callback)
 	if customErr == nil {
 		return res, nil
 	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to upload photo.")
+	return nil, custom_error.NewErrorf(customErr, "Failed to create send uploaded photo.")
 }
 
-func (f *RequestFactory) NewResendPhoto(chatID string, photo string, caption string, disableNotification bool, replyToMessageID int64, replyMarkup interface{}, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
-	sendPhotoRequest := send_requests.SendPhoto{
-		ChatID:              chatID,
-		Photo:               photo,
-		DisableNotification: disableNotification,
-		ReplyToMessageID:    replyToMessageID,
-		ReplyMarkup:         replyMarkup}
-	res, customErr := f.newPostSendType(f.sendPhotoURL, sendPhotoRequest, content_type_application_json, callback)
+func (f *RequestFactory) NewSendMessage(r *requests.SendMessage, callback OnSentCallback) ([]*SendType, custom_error.CustomError) {
+	if r == nil {
+		return nil, custom_error.MakeErrorf("Failed to create send message. Request is nil.")
+	}
+	res, customErr := f.newPostSendType(f.sendMessageURL, r, content_type_application_json, callback)
 	if customErr == nil {
 		return res, nil
 	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to resend photo.")
-}
-
-func (f *RequestFactory) NewSendMessage(chatID interface{}, message string, parseMode byte, disableWebPreview bool, disableNotifications bool, replyToMessageID int64, markup interface{}) ([]*SendType, custom_error.CustomError) {
-	var parseModeValue string
-	switch parseMode {
-	case PARSE_MODE_HTML:
-		parseModeValue = parse_mode_html
-	case PARSE_MODE_MARKDOWN:
-		parseModeValue = parse_mode_markdown
-	}
-	sendMessage := send_requests.SendMessageType{
-		ChatID:                chatID,
-		Text:                  message,
-		ParseMode:             parseModeValue,
-		DisableWebPagePreview: disableWebPreview,
-		DisableNotification:   disableNotifications,
-		ReplyToMessageID:      replyToMessageID,
-		ReplyMarkup:           markup}
-	res, customErr := f.newPostSendType(f.sendMessageURL, sendMessage, content_type_application_json, nil)
-	if customErr == nil {
-		return res, nil
-	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to send message.")
+	return nil, custom_error.NewErrorf(customErr, "Failed to create send message.")
 }
 
 func (f *RequestFactory) NewAnswerCallbackQuery(message *requests.AnswerCallbackQuery) ([]*SendType, custom_error.CustomError) {
@@ -285,11 +285,11 @@ func (f *RequestFactory) NewAnswerCallbackQuery(message *requests.AnswerCallback
 	if customErr == nil {
 		return res, nil
 	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to answer callback query.")
+	return nil, custom_error.NewErrorf(customErr, "Failed to create answer callback query.")
 }
 
 func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64) ([]*SendType, custom_error.CustomError) {
-	val := send_requests.GetUpdatesType{
+	val := send_requests.GetUpdates{
 		Offset:  offset,
 		Limit:   limit,
 		Timeout: timeout}
@@ -297,7 +297,7 @@ func (f *RequestFactory) NewGetUpdates(offset int64, limit int64, timeout int64)
 	if customErr == nil {
 		return res, nil
 	}
-	return nil, custom_error.NewErrorf(customErr, "Failed to get updates.")
+	return nil, custom_error.NewErrorf(customErr, "Failed to create get updates.")
 }
 
 func (f *RequestFactory) String() string {

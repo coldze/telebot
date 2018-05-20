@@ -120,10 +120,15 @@ func (b *pollingBot) pollIteration(currentUpdateID int64) (lastUpdateID int64) {
 	return
 }
 
-func NewPollingBot(factory *send.RequestFactory, onUpdate UpdateCallback, pollPeriodMs int64, logger logs.Logger) Bot {
+func NewPollingBot(factory *send.RequestFactory, updateProcessor UpdateProcessor, pollPeriod time.Duration, logger logs.Logger) Bot {
 	stopUpdatesChan := make(chan struct{})
-	updateProcessor := &SyncUpdateProcessor{logger: logger, onUpdate: onUpdate}
-	bot := pollingBot{stopBot: stopUpdatesChan, logger: logger, factory: factory, updateProcessor: updateProcessor, period: time.Duration(pollPeriodMs) * time.Millisecond}
+	bot := pollingBot{
+		stopBot:         stopUpdatesChan,
+		logger:          logger,
+		factory:         factory,
+		updateProcessor: updateProcessor,
+		period:          pollPeriod,
+	}
 	bot.run()
 	return &bot
 }
