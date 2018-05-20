@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/coldze/primitives/custom_error"
 	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
@@ -28,7 +29,7 @@ func main() {
 	factory := send.NewRequestFactory(botToken, logger)
 	logger.Infof("Available bot functionality:\n%v", factory)
 	logger.Infof("Request factory intialized.")
-	onUpdate := func(update *receive.UpdateType) ([]*send.SendType, error) {
+	onUpdate := func(update *receive.UpdateType) ([]*send.SendType, custom_error.CustomError) {
 		return nil, nil
 		if update == nil {
 			return nil, nil
@@ -43,13 +44,18 @@ func main() {
 			logger.Debugf("Received update:\n%v", string(dumpedUpdate))
 		}
 		var request []*send.SendType
+		var customErr custom_error.CustomError
 		if update.Message.Sticker != nil {
-			request, err = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
+			request, customErr = factory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
 		} else {
-			request, err = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+			request, customErr = factory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
 		}
-		if err != nil {
-			return nil, err
+		if customErr != nil {
+			return nil, custom_error.NewErrorf(customErr, "Failed to process update.")
+		}
+		if request == nil {
+			logger.Warningf("Processing result is empty.")
+			return nil, nil
 		}
 		for i := range request {
 			logger.Debugf("Response[%v]: %v.", i, string(request[i].Parameters))

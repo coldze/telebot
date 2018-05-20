@@ -1,9 +1,7 @@
 package bot
 
 import (
-	"errors"
-	"fmt"
-
+	"github.com/coldze/primitives/custom_error"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
 )
@@ -13,36 +11,44 @@ type CommandCallType struct {
 	MetaInfo *receive.UpdateType
 }
 
-type CommandHandler func(command *CommandCallType) ([]*send.SendType, error)
-type MessageHandler func(message *receive.UpdateType) ([]*send.SendType, error)
+type CommandHandler func(command *CommandCallType) ([]*send.SendType, custom_error.CustomError)
+type MessageHandler func(message *receive.UpdateType) ([]*send.SendType, custom_error.CustomError)
 
 type BotHandlers struct {
 	handlers  map[string]CommandHandler
 	onMessage MessageHandler
 }
 
-func (r *BotHandlers) RegisterCommand(commandName string, handler CommandHandler) error {
+func (r *BotHandlers) RegisterCommand(commandName string, handler CommandHandler) custom_error.CustomError {
 	_, ok := r.handlers[commandName]
 	if ok {
-		return fmt.Errorf("Command handler already registered: %s.", commandName)
+		return custom_error.MakeErrorf("Command handler already registered: %s.", commandName)
 	}
 	r.handlers[commandName] = handler
 	return nil
 }
 
-func (r *BotHandlers) OnCommand(commandName string, args *CommandCallType) ([]*send.SendType, error) {
+func (r *BotHandlers) OnCommand(commandName string, args *CommandCallType) ([]*send.SendType, custom_error.CustomError) {
 	handler, ok := r.handlers[commandName]
 	if !ok {
-		return nil, fmt.Errorf("Handler not set for command: %s.", commandName)
+		return nil, custom_error.MakeErrorf("Handler not set for command: %s.", commandName)
 	}
-	return handler(args)
+	res, err := handler(args)
+	if err == nil {
+		return res, nil
+	}
+	return nil, custom_error.NewErrorf(err, "Failed to handle command '%v'", commandName)
 }
 
-func (r *BotHandlers) OnMessage(message *receive.UpdateType) ([]*send.SendType, error) {
+func (r *BotHandlers) OnMessage(message *receive.UpdateType) ([]*send.SendType, custom_error.CustomError) {
 	if r.onMessage == nil {
-		return nil, errors.New("No default handler.")
+		return nil, custom_error.MakeErrorf("No default handler.")
 	}
-	return r.onMessage(message)
+	res, err := r.onMessage(message)
+	if err == nil {
+		return res, nil
+	}
+	return nil, custom_error.NewErrorf(err, "Failed to handle message.")
 }
 
 func NewBotHandlers(onMessage MessageHandler) *BotHandlers {
