@@ -12,6 +12,7 @@ import (
 	"github.com/coldze/telebot/bot"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
+	"github.com/coldze/telebot/send/requests"
 )
 
 const (
@@ -46,7 +47,13 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 		}
 		args := strings.TrimSpace(command.Argument)
 		if len(args) <= 0 {
-			res, err := requestFactory.NewSendMessage(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), "I can't find arguments for command.", 0, false, false, 0, nil)
+			sendMessage := &requests.SendMessage{
+				Base: requests.Base{
+					ChatID: command.MetaInfo.Message.Chat.ID,
+				},
+				Text: "I can't find arguments for command.",
+			}
+			res, err := requestFactory.NewSendMessage(sendMessage, nil)
 			if err == nil {
 				return res, nil
 			}
@@ -58,7 +65,13 @@ func NewOnRememberCommand(users *UsersMemory, requestFactory *send.RequestFactor
 		} else {
 			users.Memorized[command.MetaInfo.Message.From.ID] = append(users.Memorized[command.MetaInfo.Message.From.ID], args)
 		}
-		res, err := requestFactory.NewSendMessage(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), "Will remember that :)", 0, false, false, 0, nil)
+		sendMessage := &requests.SendMessage{
+			Base: requests.Base{
+				ChatID: command.MetaInfo.Message.Chat.ID,
+			},
+			Text: "Will remember that :)",
+		}
+		res, err := requestFactory.NewSendMessage(sendMessage, nil)
 		if err == nil {
 			return res, nil
 		}
@@ -94,7 +107,13 @@ func NewOnListCommand(users *UsersMemory, requestFactory *send.RequestFactory, l
 			}
 			message = buffer.String()
 		}
-		res, err := requestFactory.NewSendMessage(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), message, 0, false, false, 0, nil)
+		sendMessage := &requests.SendMessage{
+			Base: requests.Base{
+				ChatID: command.MetaInfo.Message.Chat.ID,
+			},
+			Text: message,
+		}
+		res, err := requestFactory.NewSendMessage(sendMessage, nil)
 		if err == nil {
 			return res, nil
 		}
@@ -139,14 +158,20 @@ func NewOnTestCommand(users *UsersMemory, requestFactory *send.RequestFactory, i
 		imgID := imageHolder.GetImageID()
 		if len(imgID) > 0 {
 			logger.Infof("Re-sending.")
-			res, err := requestFactory.NewResendPhoto(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), imgID, "", false, 0, nil, nil)
+			sendUploaded := &requests.SendUploadedPhoto{
+				Base: requests.Base{
+					ChatID: command.MetaInfo.Message.Chat.ID,
+				},
+				Photo: imgID,
+			}
+			res, err := requestFactory.NewSendUploadedPhoto(sendUploaded, nil)
 			if err == nil {
 				return res, nil
 			}
 			return nil, custom_error.NewErrorf(err, "Failed to create new resend photo.")
 		}
 		logger.Infof("Uploading and sending.")
-		res, err := requestFactory.NewUploadPhoto(fmt.Sprintf("%d", command.MetaInfo.Message.Chat.ID), imageFile, "", false, 0, nil, func(result *receive.SendResult, err custom_error.CustomError) {
+		onSentCallback := func(result *receive.SendResult, err custom_error.CustomError) {
 			if err != nil {
 				logger.Errorf("Failed to send response. Error: %v", err)
 			}
@@ -168,7 +193,14 @@ func NewOnTestCommand(users *UsersMemory, requestFactory *send.RequestFactory, i
 			if len(imageID) > 0 {
 				imageHolder.SetImageID(imageID)
 			}
-		})
+		}
+		sendFile := &requests.SendFileBase{
+			Base: requests.Base{
+				ChatID: command.MetaInfo.Message.Chat.ID,
+			},
+			FileName: imageFile,
+		}
+		res, err := requestFactory.NewUploadPhoto(sendFile, onSentCallback)
 		if err == nil {
 			return res, nil
 		}
@@ -197,9 +229,22 @@ func main() {
 		var result []*send.SendType
 		var err custom_error.CustomError
 		if update.Message.Sticker != nil {
-			result, err = requestFactory.NewSendSticker(fmt.Sprintf("%v", update.Message.Chat.ID), STICKER_ID, false, 0, nil)
+			sendSticker := &requests.SendSticker{
+				Base: requests.Base{
+					ChatID: update.Message.Chat.ID,
+				},
+				Sticker: STICKER_ID,
+			}
+			result, err = requestFactory.NewSendSticker(sendSticker, nil)
 		} else {
-			result, err = requestFactory.NewSendMessage(fmt.Sprintf("%v", update.Message.Chat.ID), "*ECHO:*\n"+update.Message.Text, send.PARSE_MODE_MARKDOWN, false, false, 0, nil)
+			sendMessage := &requests.SendMessage{
+				Base: requests.Base{
+					ChatID: update.Message.Chat.ID,
+				},
+				Text:      "*ECHO:*\n" + update.Message.Text,
+				ParseMode: send.PARSE_MODE_MARKDOWN,
+			}
+			result, err = requestFactory.NewSendMessage(sendMessage, nil)
 		}
 		if err != nil {
 			return nil, custom_error.NewErrorf(err, "Failed to process message.")
