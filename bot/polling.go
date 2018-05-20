@@ -4,6 +4,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/coldze/primitives/custom_error"
 	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
@@ -21,20 +22,20 @@ func (b *pollingBot) Stop() {
 	b.stopBot <- struct{}{}
 }
 
-func (b *pollingBot) Send(msg []*send.SendType) error {
+func (b *pollingBot) Send(msg []*send.SendType) custom_error.CustomError {
 	_, err := sendResponse(msg)
 	if err != nil {
-		return err
+		return custom_error.NewErrorf(err, "Failed to send")
 	}
 	return nil
 }
 
-func (b *pollingBot) sendRequests(messages []*send.SendType) error {
-	var err error
+func (b *pollingBot) sendRequests(messages []*send.SendType) custom_error.CustomError {
+	var err custom_error.CustomError
 	for i := range messages {
 		_, err = sendRequest(messages[i])
 		if err != nil {
-			return err
+			return custom_error.NewErrorf(err, "Failed to send request")
 		}
 	}
 	return nil

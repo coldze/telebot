@@ -1,13 +1,16 @@
 package send
 
-import "github.com/coldze/telebot/receive"
+import (
+	"github.com/coldze/primitives/custom_error"
+	"github.com/coldze/telebot/receive"
+)
 
 const (
 	SEND_TYPE_POST = iota + 1
 	SEND_TYPE_GET
 )
 
-type OnSentCallback func(result *receive.SendResult, err error)
+type OnSentCallback func(result *receive.SendResult, error custom_error.CustomError)
 
 type SendType struct {
 	URL         string
@@ -20,7 +23,7 @@ type SendType struct {
 type SendResultWithCallback struct {
 	Result   *receive.SendResult
 	Callback OnSentCallback
-	Error    error
+	Error    custom_error.CustomError
 }
 
 type RequestSender interface {

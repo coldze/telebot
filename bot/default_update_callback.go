@@ -1,10 +1,10 @@
 package bot
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/coldze/primitives/custom_error"
 	"github.com/coldze/primitives/logs"
 	"github.com/coldze/telebot/receive"
 	"github.com/coldze/telebot/send"
@@ -34,49 +34,66 @@ func parseCommandFromCallbackQuery(update *receive.UpdateType) (*CommandCallType
 	}, update.CallbackQuery.Data
 }
 
-func NewDefaultUpdateCallback(factory *send.RequestFactory, logger logs.Logger, handlers *BotHandlers) (UpdateCallback, error) {
+func wrapResult(factory *send.RequestFactory, chatID interface{}, errValue custom_error.CustomError) ([]*send.SendType, custom_error.CustomError) {
+	res, customErr := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+	if customErr == nil {
+		return res, nil
+	}
+	return nil, custom_error.NewErrorf(customErr, "Failed to send error notification. Original error: %v", errValue)
+}
+
+func wrapCallbackResult(factory *send.RequestFactory, chatID interface{}, callbackID interface{}, errValue custom_error.CustomError) ([]*send.SendType, custom_error.CustomError) {
+	resp, customErr := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
+	if customErr != nil {
+		return nil, custom_error.NewErrorf(customErr, "Failed to send error notification. Original error: %v", errValue)
+	}
+	respCallback, customErr := factory.NewAnswerCallbackQuery(&requests.AnswerCallbackQuery{
+		CallbackQueryID: callbackID,
+		ShowAlert:       true,
+		Text:            "Failed to process",
+	})
+	if customErr != nil {
+		return resp, custom_error.NewErrorf(customErr, "Failed to create answer callback query")
+	}
+	return append(resp, respCallback...), nil
+}
+
+func NewDefaultUpdateCallback(factory *send.RequestFactory, logger logs.Logger, handlers *BotHandlers) (UpdateCallback, custom_error.CustomError) {
 	if logger == nil {
-		return nil, errors.New("Invalid logger specified.")
+		return nil, custom_error.MakeErrorf("Invalid logger specified.")
 	}
 	if handlers == nil {
-		return nil, errors.New("Invalid handlers specified.")
+		return nil, custom_error.MakeErrorf("Invalid handlers specified.")
 	}
-	wrapResult := func(chatID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
-		if errValue == nil {
-			return resp, errValue
-		}
-		return factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
-	}
-	wrapCallbackResult := func(chatID interface{}, callbackID interface{}, resp []*send.SendType, errValue error) ([]*send.SendType, error) {
-		if errValue == nil {
-			return resp, errValue
-		}
-		resp, err := factory.NewSendMessage(chatID, fmt.Sprintf("Internal error: %v", errValue), 0, false, false, 0, nil)
-		if err != nil {
-			return nil, err
-		}
-		respCallback, err := factory.NewAnswerCallbackQuery(&requests.AnswerCallbackQuery{
-			CallbackQueryID: callbackID,
-			ShowAlert:       true,
-			Text:            "Failed to process",
-		})
-		if err != nil {
-			return resp, err
-		}
-		return append(resp, respCallback...), nil
-	}
-	return func(update *receive.UpdateType) ([]*send.SendType, error) {
+
+	return func(update *receive.UpdateType) ([]*send.SendType, custom_error.CustomError) {
 		if update.CallbackQuery != nil {
 			cmd, cmdName := parseCommandFromCallbackQuery(update)
 			resp, err := handlers.OnCommand(cmdName, cmd)
-			return wrapCallbackResult(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.ID, resp, err)
+			if err == nil {
+				return resp, nil
+			}
+			logger.Errorf("Failed to handle command '%v'. Error: %v", cmd, err)
+			errResp, customErr := wrapCallbackResult(factory, update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.ID, custom_error.NewErrorf(err, "Failed to handle command"))
+			if customErr != nil {
+				customErr = custom_error.NewErrorf(customErr, "Failed to send error through callback.")
+				logger.Errorf("Failed to send error through callback after error handling command '%v'. Error: %v", cmd, customErr)
+				return nil, customErr
+			}
+			return errResp, nil
 		}
 		if update == nil {
 			return nil, nil
 		}
 		msg := GetMessage(update)
 		if msg == nil {
-			return handlers.OnMessage(update)
+			resp, customErr := handlers.OnMessage(update)
+			if customErr != nil {
+				customErr = custom_error.NewErrorf(customErr, "Failed to handle message")
+				logger.Errorf("Failed to handle empty message. Error: %v", customErr)
+				return nil, customErr
+			}
+			return resp, nil
 		}
 		chatID := int64(-1)
 		if msg.Chat != nil {
@@ -84,14 +101,43 @@ func NewDefaultUpdateCallback(factory *send.RequestFactory, logger logs.Logger, 
 		}
 		if msg.Entities == nil {
 			resp, err := handlers.OnMessage(update)
-			return wrapResult(chatID, resp, err)
+			if err == nil {
+				return resp, nil
+			}
+			logger.Errorf("Failed to handle message. Error: %v", err)
+			errResp, customErr := wrapResult(factory, chatID, custom_error.NewErrorf(err, "Failed to handle message"))
+			if customErr != nil {
+				customErr = custom_error.NewErrorf(customErr, "Failed to send error")
+				logger.Errorf("Failed to send error after error handling message. Error: %v", customErr)
+				return nil, customErr
+			}
+			return errResp, nil
 		}
 		cmd, cmdName := parseCommand(msg, update)
 		if cmd == nil {
 			resp, err := handlers.OnMessage(update)
-			return wrapResult(chatID, resp, err)
+			logger.Errorf("Failed to handle message. Error: %v", err)
+			if err == nil {
+				return resp, nil
+			}
+			errResp, customErr := wrapResult(factory, chatID, custom_error.NewErrorf(err, "Failed to handle message"))
+			if customErr != nil {
+				customErr = custom_error.NewErrorf(customErr, "Failed to send error")
+				logger.Errorf("Failed to send error after error handling message. Error: %v", customErr)
+				return nil, customErr
+			}
+			return errResp, nil
 		}
 		resp, err := handlers.OnCommand(cmdName, cmd)
-		return wrapResult(chatID, resp, err)
+		if err == nil {
+			return resp, nil
+		}
+		errResp, customErr := wrapResult(factory, chatID, custom_error.NewErrorf(err, "Failed to handle command '%v'", cmdName))
+		if customErr != nil {
+			customErr = custom_error.NewErrorf(customErr, "Failed to send error")
+			logger.Errorf("Failed to send error after error handling command. Error: %v", customErr)
+			return nil, customErr
+		}
+		return errResp, nil
 	}, nil
 }
